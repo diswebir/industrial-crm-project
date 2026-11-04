@@ -15,7 +15,11 @@ declare(strict_types=1);
 header('Content-Type: text/html; charset=utf-8');
 header('X-Robots-Tag: noindex');
 
-$baseDir = dirname(__DIR__);
+$baseDir = require __DIR__ . '/paths.php';
+if (!is_string($baseDir) || !is_file($baseDir . '/vendor/autoload.php')) {
+    http_response_code(500);
+    exit('Application path is not configured.');
+}
 $envPath = $baseDir . '/.env';
 
 /* ─────────── Helper functions ─────────── */
@@ -103,6 +107,27 @@ function page(string $title, string $body): string
         . $body . '</div></div></body></html>';
 }
 
+// A secret placed manually outside the web root enables the installer.
+$tokenFile = $baseDir . '/.install-token';
+$expected = is_file($tokenFile) ? trim((string) file_get_contents($tokenFile)) : '';
+if (strlen($expected) < 32 || !preg_match('/^[a-f0-9]{32,128}$/i', $expected)) {
+    http_response_code(403);
+    exit('Installer is disabled. Create a random hexadecimal .install-token in the private directory.');
+}
+session_start();
+if (isset($_POST['install_token']) && hash_equals($expected, (string) $_POST['install_token'])) {
+    session_regenerate_id(true);
+    $_SESSION['installer_authorized'] = hash('sha256', $expected);
+}
+if (!hash_equals(hash('sha256', $expected), (string) ($_SESSION['installer_authorized'] ?? ''))) {
+    echo page('ورود نصب‌کننده', '<form method="post"><label>کد نصب از فایل خصوصی .install-token</label><input type="password" name="install_token" required><button>ادامه</button></form>');
+    exit;
+}
+if (is_file($envPath)) {
+    http_response_code(403);
+    exit('An .env file already exists. For a fresh installation remove it manually only after backing it up.');
+}
+
 /* ─────────── Guard: already installed? ─────────── */
 
 $state = installedState($envPath);
@@ -128,6 +153,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $appUrl   = $appUrl !== '' ? $appUrl : 'https://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
 
     $errors = [];
+    $adminPassword = (string) ($_POST['admin_password'] ?? '');
+    if (strlen($adminPassword) < 12 || preg_match('/[\r\n]/', $adminPassword)) $errors[] = 'رمز مدیر باید حداقل ۱۲ نویسه و بدون خط جدید باشد.';
+    foreach ([$c['host'], $c['port'], $c['database'], $c['username'], $c['password'], $appUrl] as $value) {
+        if (preg_match('/[\r\n]/', $value)) $errors[] = 'مقادیر فرم نباید شامل خط جدید باشند.';
+    }
+    if (!preg_match('/^[a-zA-Z0-9_.:-]+$/', $c['host']) || !ctype_digit($c['port']) || (int)$c['port'] < 1 || (int)$c['port'] > 65535 || !preg_match('/^[a-zA-Z0-9_$-]+$/', $c['database'])) $errors[] = 'مشخصات اتصال دیتابیس نامعتبر است.';
+    if (!filter_var($appUrl, FILTER_VALIDATE_URL)) $errors[] = 'آدرس سایت نامعتبر است.';
     if ($c['database'] === '') $errors[] = 'نام دیتابیس الزامی است.';
     if ($c['username'] === '') $errors[] = 'نام کاربری دیتابیس الزامی است.';
     if (!preg_match('#^https?://#i', $appUrl)) $errors[] = 'آدرس سایت باید با http:// یا https:// شروع شود.';
@@ -135,6 +167,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$errors) {
         try {
             $pdo = dbConnect($c);
+            if ($pdo->query('SHOW TABLES')->fetchColumn() !== false) $errors[] = 'دیتابیس باید خالی باشد.';
         } catch (Throwable $e) {
             $errors[] = 'اتصال به دیتابیس ناموفق بود: ' . $e->getMessage();
         }
@@ -148,13 +181,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // All good → write .env with a fresh APP_KEY
     $appKey = 'base64:' . base64_encode(random_bytes(32));
+    // dotenv single quotes preserve special characters without interpolation.
+    $quote = static fn(string $v): string => "'" . str_replace(['\\', "'"], ['\\\\', "\\'"], $v) . "'";
+    $appUrlEnv = $quote($appUrl);
+    $hostEnv = $quote($c['host']);
+    $dbEnv = $quote($c['database']);
+    $userEnv = $quote($c['username']);
+    $passEnv = $quote($c['password']);
     $env = <<<ENV
 APP_NAME="Parts CRM"
 APP_ENV=production
 APP_DEBUG=false
 APP_KEY={$appKey}
 APP_TIMEZONE=Asia/Tehran
-APP_URL={$appUrl}
+APP_URL={$appUrlEnv}
 
 APP_LOCALE=en
 APP_FALLBACK_LOCALE=en
@@ -170,11 +210,11 @@ LOG_DEPRECATIONS_CHANNEL=null
 LOG_LEVEL=error
 
 DB_CONNECTION=mysql
-DB_HOST={$c['host']}
+DB_HOST={$hostEnv}
 DB_PORT={$c['port']}
-DB_DATABASE={$c['database']}
-DB_USERNAME={$c['username']}
-DB_PASSWORD={$c['password']}
+DB_DATABASE={$dbEnv}
+DB_USERNAME={$userEnv}
+DB_PASSWORD={$passEnv}
 
 SESSION_DRIVER=file
 SESSION_LIFETIME=120
@@ -206,37 +246,43 @@ ENV;
     @chmod($envPath, 0640);
 
     // Ensure runtime dirs exist
-    foreach (['storage/framework/sessions', 'storage/framework/cache/data', 'storage/framework/views', 'storage/logs', 'public/storage'] as $dir) {
+    foreach (['storage/framework/sessions', 'storage/framework/cache/data', 'storage/framework/views', 'storage/logs'] as $dir) {
         @mkdir($baseDir . '/' . $dir, 0755, true);
     }
+
+    @mkdir(__DIR__ . '/storage', 0755, true);
+
+    putenv('INITIAL_ADMIN_PASSWORD=' . $adminPassword);
 
     // Bootstrap Laravel AFTER .env is written so it sees the new config
     require $baseDir . '/vendor/autoload.php';
     $app = require $baseDir . '/bootstrap/app.php';
+    $app->usePublicPath(__DIR__);
     $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
     $kernel->bootstrap();
 
     $migrateOut = '';
     $seedOut = '';
     try {
-        Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+        if (Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]) !== 0) throw new RuntimeException('Migration failed. Check the server log.');
         $migrateOut = Illuminate\Support\Facades\Artisan::output();
-        Illuminate\Support\Facades\Artisan::call('db:seed', ['--force' => true]);
-        $seedOut = Illuminate\Support\Facades\Artisan::output();
+
     } catch (Throwable $e) {
         echo page('خطای مایگریشن', '<div class="warn">دیتابیس متصل شد و .env نوشته شد، اما اجرای جداول خطا داد:</div>'
             . '<pre>' . e($e->getMessage()) . '</pre>'
-            . '<div class="note">خطا را برطرف کنید و دوباره فرم را ارسال کنید (یا جداول را از phpMyAdmin حذف و تلاش کنید).</div>');
+            . '<div class="note">برای تلاش مجدد، پس از بررسی خطا و تهیه پشتیبان، .env خصوصی و جدول‌های نصب ناقص را دستی حذف کنید.</div>');
         exit;
     }
 
+    putenv('INITIAL_ADMIN_PASSWORD');
+    @unlink($tokenFile);
     $selfDeleted = @unlink(__FILE__);
 
     echo page('نصب کامل شد ✅',
         '<div class="note">🎉 تبریک! برنامه با موفقیت نصب شد.</div>'
-        . '<p><b>مراحل انجام‌شده:</b></p><pre>migrate:\n' . e(trim($migrateOut)) . '\n\nseed:\n' . e(trim($seedOut)) . '</pre>'
+        . '<p><b>مراحل انجام‌شده:</b></p><pre>migrate:\n' . e(trim($migrateOut)) . '</pre>'
         . '<p><b>اطلاعات ورود مدیر سیستم:</b></p>'
-        . '<pre>نام کاربری: admin@crm.local  (یا موبایل: 09120000000)\nرمز عبور:  Admin@123456</pre>'
+        . '<pre>نام کاربری: admin@crm.local  (یا موبایل: 09120000000)\nرمز عبور: رمزی که در فرم وارد کردید</pre>'
         . '<div class="warn">⚠️ <b>الان سه کار فوری انجام بده:</b><ol>'
         . '<li>وارد برنامه شو و <b>رمز عبور ادمین را عوض کن</b></li>'
         . '<li>این فایل (' . ($selfDeleted ? 'که خودکار حذف شد ✓' : 'install.php — خودکار حذف نشد، دستی از پوشه public حذف کن') . ') دیگر در دسترس نباشد</li>'
@@ -278,6 +324,7 @@ echo page('نصب Industrial CRM',
     . '<label>نام دیتابیس (مثلاً youruser_crmdb)</label><input name="db_name" value="' . e($prefill['database']) . '" placeholder="youruser_crmdb">'
     . '<label>نام کاربری دیتابیس</label><input name="db_user" value="' . e($prefill['username']) . '" placeholder="youruser_crmuser">'
     . '<label>رمز عبور دیتابیس</label><input type="password" name="db_pass" placeholder="••••••••">'
+    . '<label>رمز مدیر (حداقل ۱۲ نویسه)</label><input type="password" name="admin_password" minlength="12" required>'
     . '<button type="submit"' . ($allOk ? '' : ' disabled') . '>🚀 شروع نصب (ساخت جداول + داده اولیه)</button>'
     . '</form>'
     . '<div class="note">💡 قبل از این فرم، در cPanel با <b>MySQL Database Wizard</b> یک دیتابیس خالی و کاربر آن را ساخته باش. این نصب‌کننده خودش جدول‌ها را می‌سازد — دیگر نیازی به Import فایل SQL از phpMyAdmin نیست.</div>');

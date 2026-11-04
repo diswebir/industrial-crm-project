@@ -29,7 +29,8 @@ fi
 restore_env() {
   if [ "$TMP_ENV" = "1" ] && [ -f "$BACKEND/.env" ]; then rm -f "$BACKEND/.env"; fi
 }
-trap restore_env EXIT
+cleanup() { restore_env; rm -rf "$STAGE"; }
+trap cleanup EXIT
 
 echo "==> 1/7 Installing backend dependencies (composer --no-dev)"
 composer install --no-dev --optimize-autoloader --no-interaction --working-dir="$BACKEND" --quiet
@@ -47,6 +48,9 @@ rm -rf "$STAGE/.env" \
        "$STAGE/database/database.sqlite" \
        "$STAGE/Dockerfile" \
        "$STAGE/docker-entrypoint.sh"
+rm -rf "$STAGE/storage/app" "$STAGE/public/storage"
+mkdir -p "$STAGE/storage/app/private" "$STAGE/storage/app/public"
+find "$STAGE/bootstrap/cache" -type f ! -name '.gitignore' -delete
 rm -f  "$STAGE/storage/logs/"*.log 2>/dev/null || true
 find "$STAGE/storage/framework/sessions" "$STAGE/storage/framework/cache/data" "$STAGE/storage/framework/views" -type f ! -name '.gitignore' -delete 2>/dev/null || true
 
@@ -57,25 +61,33 @@ cp -r "$FRONTEND/dist/." "$STAGE/public/"
 # htaccess مسیریابی SPA + API
 cp "$DEPLOY/htaccess/public.htaccess" "$STAGE/public/.htaccess"
 # htaccess ریشه (برای نصب داخل public_html) — با پسوند غیرفعال
-cp "$DEPLOY/htaccess/root.htaccess" "$STAGE/_cpanel-root-htaccess.txt"
+
 # نصب‌کننده وب + به‌روزرسان دیتابیس + بررسی سلامت
-cp "$DEPLOY/install.php" "$DEPLOY/update.php" "$DEPLOY/setup-check.php" "$STAGE/public/"
+cp "$DEPLOY/install.php" "$STAGE/public/"
+cp "$DEPLOY/index.php" "$DEPLOY/paths.php" "$STAGE/public/"
 # پوشه آپلودها (بدون نیاز به symlink)
 mkdir -p "$STAGE/public/storage"
-touch "$STAGE/public/storage/.gitkeep"
+cat > "$STAGE/public/storage/.htaccess" <<'HTACCESS'
+Options -Indexes
+<FilesMatch "\.(php[0-9]?|phtml|phar|cgi|pl|py|shtml)$">
+    Require all denied
+</FilesMatch>
+HTACCESS
 # راهنمای سریع
 cp "$DEPLOY/README.md" "$STAGE/README-FIRST-cpanel.txt"
 
-echo "==> 5/7 Writing .env.cpanel.example with fresh APP_KEY"
-APP_KEY="base64:$(php -r 'echo base64_encode(random_bytes(32));')"
-sed "s|__GENERATED_AT_BUILD__|$APP_KEY|" "$DEPLOY/env.cpanel.example" > "$STAGE/.env.cpanel.example"
+echo "==> 5/7 Removing local environment files"
+rm -f "$STAGE"/.env.*
 
 echo "==> 6/7 Zipping"
 mkdir -p "$OUT_DIR"
-rm -f "$OUT_DIR/cpanel-app.zip"
-(cd "$STAGE" && zip -qr "$OUT_DIR/cpanel-app.zip" .)
+rm -f "$OUT_DIR/cpanel-private.zip" "$OUT_DIR/cpanel-public.zip"
+# Two archives: only public files belong under the domain document root.
+(cd "$STAGE/public" && zip -qr "$OUT_DIR/cpanel-public.zip" .)
+rm -rf "$STAGE/public"
+(cd "$STAGE" && zip -qr "$OUT_DIR/cpanel-private.zip" .)
 
 echo "==> 7/7 Done"
 echo ""
-echo "✅ Built: $OUT_DIR/cpanel-app.zip ($(du -h "$OUT_DIR/cpanel-app.zip" | cut -f1))"
+echo "✅ Built: $OUT_DIR/cpanel-private.zip and $OUT_DIR/cpanel-public.zip"
 echo "   ℹ️  برای ساخت crm-database.sql (روش نصب دستی) راهنمای deploy/cpanel/README.md را ببین."

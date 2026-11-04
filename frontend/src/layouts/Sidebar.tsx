@@ -223,7 +223,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           </a>
 
           <a
-            href="http://localhost:8000/docs/api"
+            href="/docs/api"
             target="_blank"
             rel="noreferrer"
             className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs font-semibold text-blue-900 hover:bg-blue-100 transition-colors dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-300"

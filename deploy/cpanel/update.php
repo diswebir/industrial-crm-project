@@ -17,7 +17,8 @@ declare(strict_types=1);
 header('Content-Type: text/html; charset=utf-8');
 header('X-Robots-Tag: noindex');
 
-$baseDir = dirname(__DIR__);
+$baseDir = require __DIR__ . '/paths.php';
+if (!is_string($baseDir) || !is_file($baseDir . '/vendor/autoload.php')) { http_response_code(500); exit('Application path is not configured.'); }
 $envPath = $baseDir . '/.env';
 
 function e(string $s): string { return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
@@ -57,6 +58,7 @@ if (!is_file($baseDir . '/vendor/autoload.php')) {
 }
 require $baseDir . '/vendor/autoload.php';
 $app = require $baseDir . '/bootstrap/app.php';
+$app->usePublicPath(__DIR__);
 $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
 $kernel->bootstrap();
 
