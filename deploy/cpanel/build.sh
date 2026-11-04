@@ -17,8 +17,8 @@ for command in php composer node npm zip unzip tar; do
         exit 1
     fi
 done
-# openspout in the production composer.lock requires PHP 8.3, despite composer.json's lower minimum.
-php -r 'if (PHP_VERSION_ID < 80300) {fwrite(STDERR, "ERROR: PHP 8.3+ is required by composer.lock.\n"); exit(1);}'
+# The locked Symfony 8 packages require PHP 8.4.1, despite composer.json's lower minimum.
+php -r 'if (PHP_VERSION_ID < 80401) {fwrite(STDERR, "ERROR: PHP 8.4.1+ is required by composer.lock.\n"); exit(1);}'
 node -e 'const [major, minor] = process.versions.node.split(".").map(Number); if (major < 20 || (major === 20 && minor < 19) || (major === 22 && minor < 12) || major === 21) { console.error("ERROR: Vite requires Node.js 20.19+ or 22.12+."); process.exit(1); }'
 
 # Resolve relative output paths before changing directories, including paths containing spaces.
