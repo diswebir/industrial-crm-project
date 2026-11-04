@@ -1,0 +1,47 @@
+name: Test cPanel package
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+jobs:
+  build-and-install:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpass
+          MYSQL_DATABASE: crm_test
+          MYSQL_USER: crm
+          MYSQL_PASSWORD: crmtestpass
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -prootpass"
+          --health-interval=10s --health-timeout=5s --health-retries=12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo_mysql, curl, xml, zip, gd, bcmath
+          tools: composer:v2
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build and check archives
+        run: bash deploy/cpanel/build.sh
+      - name: Smoke test installation with MySQL
+        env:
+          TEST_DB_HOST: 127.0.0.1
+          TEST_DB_PORT: '3306'
+          TEST_DB_NAME: crm_test
+          TEST_DB_USER: crm
+          TEST_DB_PASS: crmtestpass
+        run: bash deploy/cpanel/tests/smoke-install.sh
+      - name: Check PHP syntax
+        run: |
+          find deploy/cpanel -name '*.php' -exec php -l {} \;
+      - name: Packaging regression tests
+        run: bash deploy/cpanel/tests/test-build.sh

@@ -4,20 +4,9 @@
 
 ---
 
-## 🟢 استقرار روی هاست cPanel (بدون SSH) — روش اصلی
+## 🟢 استقرار روی هاست cPanel
 
-این پروژه یک **مسیر استقرار کامل روی cPanel** دارد که کاملاً بدون SSH، Composer و Node کار می‌کند:
-
-- **نصب جدید:** پکیج `cpanel-app.zip` را از [GitHub Releases](../../releases) دانلود کن، روی هاست استخراج کن و `install.php` را در مرورگر باز کن (نصب‌کننده تحت وب مثل وردپرس: اتصال دیتابیس + ساخت `.env` + مایگریشن‌ها + داده اولیه).
-- **به‌روزرسانی:** زیپ نسخه جدید را روی نسخه قبلی استخراج کن و `update.php` را با `APP_KEY` اجرا کن.
-- راهنمای کامل فارسی: [`deploy/cpanel/README.md`](deploy/cpanel/README.md)
-
-### ساخت پکیج (توسعه‌دهنده)
-با push کردن تگ نسخه، GitHub Actions خودش پکیج را می‌سازد و به Release پیوست می‌کند:
-```bash
-git tag v1.0.1 && git push origin v1.0.1
-```
-بیلد لوکال: `bash deploy/cpanel/build.sh` (خروجی: `cpanel-release/cpanel-app.zip`)
+پکیج نصب از دو آرشیو مجزای عمومی و خصوصی تشکیل می‌شود و نصب‌کننده وب دارد. راهنمای مسیرهای قابل تنظیم، پیش‌نیازها و به‌روزرسانی در [`deploy/cpanel/README.md`](deploy/cpanel/README.md) است. برای ساخت بسته روی سیستم دارای PHP، Composer و Node دستور `bash deploy/cpanel/build.sh` را اجرا کنید. نصب بسته آماده روی هاست به Composer و Node نیاز ندارد؛ برای اجرای مایگریشن در به‌روزرسانی به Terminal/SSH یا کمک میزبان نیاز است.
 
 ---
 
