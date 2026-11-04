@@ -77,10 +77,17 @@ putenv('APP_PUBLIC_PATH=' . $publicDir);
 $_ENV['APP_PUBLIC_PATH'] = $publicDir;
 $_SERVER['APP_PUBLIC_PATH'] = $publicDir;
 
-require $baseDir . '/vendor/autoload.php';
-$app = require $baseDir . '/bootstrap/app.php';
-$kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
-$kernel->bootstrap();
+try {
+    require $baseDir . '/vendor/autoload.php';
+    $app = require $baseDir . '/bootstrap/app.php';
+    $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+    $kernel->bootstrap();
+} catch (Throwable $e) {
+    http_response_code(500);
+    echo page('خطا', '❌ لود برنامه Laravel ناموفق بود:<pre>' . e($e->getMessage()) . '</pre>'
+        . '<div class="note">احتمالاً پوشه <code>vendor</code> کامل آپلود نشده است. زیپ cpanel-private.zip را دوباره کامل extract کنید.</div>');
+    exit;
+}
 
 $appKey = (string) envValue($envPath, 'APP_KEY');
 

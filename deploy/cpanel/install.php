@@ -159,7 +159,7 @@ if ($state['state'] === 'installed') {
 
 /* ─────────── Step 2: process form ─────────── */
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     // Private app path (split deployment) — from pointer, env, or the form field
     $privatePath = rtrim(trim((string) ($_POST['app_base_path'] ?? '')), '/');
     if ($privatePath === '') {
@@ -327,7 +327,7 @@ $rows = '';
 foreach ($checks as [$label, $ok, $detail]) {
     $allOk = $allOk && $ok;
     $rows .= '<tr><td>' . e($label) . '</td><td class="' . ($ok ? 'ok' : 'bad') . '">' . ($ok ? '✅' : '❌') . '</td>'
-        . '<td class="bad">' . e((string) $detail) . '</td></tr>';
+        . '<td class="det">' . e((string) $detail) . '</td></tr>';
 }
 
 $dbNote = '';
