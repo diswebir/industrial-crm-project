@@ -17,7 +17,22 @@ declare(strict_types=1);
 header('Content-Type: text/html; charset=utf-8');
 header('X-Robots-Tag: noindex');
 
-$baseDir = dirname(__DIR__);
+$publicDir = __DIR__;
+
+/* Resolve the private app root: app-path.txt pointer → APP_BASE_PATH env → parent of public/ */
+function crm_resolve_app_base(string $publicDir): string
+{
+    $pointer = $publicDir . '/app-path.txt';
+    if (is_file($pointer)) {
+        $p = rtrim(trim((string) file_get_contents($pointer)), '/');
+        if ($p !== '' && is_dir($p)) return $p;
+    }
+    $env = getenv('APP_BASE_PATH');
+    if ($env && is_dir($env)) return rtrim($env, '/');
+    return dirname($publicDir);
+}
+
+$baseDir = crm_resolve_app_base($publicDir);
 $envPath = $baseDir . '/.env';
 
 function e(string $s): string { return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
@@ -55,6 +70,13 @@ if (!is_file($baseDir . '/vendor/autoload.php')) {
     echo page('خطا', 'پوشه vendor یافت نشد — برنامه کامل آپلود نشده است.');
     exit;
 }
+putenv('APP_BASE_PATH=' . $baseDir);
+$_ENV['APP_BASE_PATH'] = $baseDir;
+$_SERVER['APP_BASE_PATH'] = $baseDir;
+putenv('APP_PUBLIC_PATH=' . $publicDir);
+$_ENV['APP_PUBLIC_PATH'] = $publicDir;
+$_SERVER['APP_PUBLIC_PATH'] = $publicDir;
+
 require $baseDir . '/vendor/autoload.php';
 $app = require $baseDir . '/bootstrap/app.php';
 $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);

@@ -1,0 +1,16 @@
+# ------------------------------------------------------------------
+#  App private-path pointer (split deployment on cPanel)
+# ------------------------------------------------------------------
+#  In a "split" deployment, this file (renamed to app-path.txt) sits next
+#  to index.php inside the web root and contains the ABSOLUTE path of the
+#  private application folder, for example:
+#
+#      /home/youruser/private_pro/project1/myc
+#
+#  If this file is missing, the app assumes the private folder is the
+#  parent of public/ (standard single-folder layout).
+#
+#  install.php creates this file automatically. It is blocked from public
+#  access by .htaccess.
+# ------------------------------------------------------------------
+/home/youruser/private_pro/project1/myc

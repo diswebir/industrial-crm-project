@@ -1,4 +1,15 @@
+# -----------------------------------------------------------------
+#  .htaccess for the public/ folder — cPanel deployment
+#  Used both in split mode (public files directly in the web root)
+#  and single-folder mode (public/ inside public_html).
+# -----------------------------------------------------------------
+
 DirectoryIndex index.html index.php
+
+# Block sensitive files from web access (app-path.txt pointer, .env, composer files)
+<FilesMatch "^(app-path\.txt|\.env|\.env\..*|composer\.(json|lock))$">
+    Require all denied
+</FilesMatch>
 
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
@@ -11,6 +22,10 @@ DirectoryIndex index.html index.php
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
+    # Handle X-XSRF-Token Header
+    RewriteCond %{HTTP:x-xsrf-token} .
+    RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
+
     # Redirect Trailing Slashes If Not A Folder...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} (.+)/$
@@ -20,7 +35,7 @@ DirectoryIndex index.html index.php
     # Any path that is not a real file/folder and is NOT handled by the Laravel
     # backend (api / admin / docs / livewire / storage / backend assets)
     # is served the single-page application shell so client-side routes
-    # like /customers or /settings/users work on hard refresh.
+    # like /customers or /settings work on hard refresh.
     # The optional "public/" prefix keeps this working when the app lives inside
     # public_html and a root .htaccess rewrites requests into public/.
     RewriteCond %{REQUEST_FILENAME} !-f
