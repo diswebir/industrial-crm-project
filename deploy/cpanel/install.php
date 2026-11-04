@@ -74,8 +74,8 @@ function installedState(string $envPath): array
 function checkEnvironment(string $baseDir): array
 {
     $checks = [];
-    $checks[] = ['نسخه PHP (حداقل 8.2)', version_compare(PHP_VERSION, '8.2.0', '>='), PHP_VERSION];
-    foreach (['pdo_mysql', 'mbstring', 'openssl', 'fileinfo', 'curl', 'tokenizer', 'xml'] as $ext) {
+    $checks[] = ['نسخه PHP (حداقل 8.3)', version_compare(PHP_VERSION, '8.3.0', '>='), PHP_VERSION];
+    foreach (['pdo_mysql', 'mbstring', 'openssl', 'fileinfo', 'curl', 'tokenizer', 'xml', 'dom', 'xmlwriter', 'xmlreader', 'zip', 'gd', 'bcmath'] as $ext) {
         $checks[] = ['افزونه PHP: ' . $ext, extension_loaded($ext), extension_loaded($ext) ? 'فعال' : 'غیرفعال — از Select PHP Version فعال کنید'];
     }
     $checks[] = ['وجود vendor (برنامه کامل)', is_dir($baseDir . '/vendor'), is_dir($baseDir . '/vendor') ? 'ok' : 'vendor یافت نشد'];
@@ -118,6 +118,8 @@ session_start();
 if (isset($_POST['install_token']) && hash_equals($expected, (string) $_POST['install_token'])) {
     session_regenerate_id(true);
     $_SESSION['installer_authorized'] = hash('sha256', $expected);
+    header('Location: install.php', true, 303);
+    exit;
 }
 if (!hash_equals(hash('sha256', $expected), (string) ($_SESSION['installer_authorized'] ?? ''))) {
     echo page('ورود نصب‌کننده', '<form method="post"><label>کد نصب از فایل خصوصی .install-token</label><input type="password" name="install_token" required><button>ادامه</button></form>');
