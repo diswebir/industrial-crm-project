@@ -6,18 +6,20 @@
 
 ## 🟢 استقرار روی هاست cPanel (بدون SSH) — روش اصلی
 
-این پروژه یک **مسیر استقرار کامل روی cPanel** دارد که کاملاً بدون SSH، Composer و Node کار می‌کند:
+این پروژه یک **مسیر استقرار کامل روی cPanel** دارد که کاملاً بدون SSH، Composer و Node کار می‌کند و از **ساختار split (public/private)** پشتیبانی می‌کند:
 
-- **نصب جدید:** پکیج `cpanel-app.zip` را از [GitHub Releases](../../releases) دانلود کن، روی هاست استخراج کن و `install.php` را در مرورگر باز کن (نصب‌کننده تحت وب مثل وردپرس: اتصال دیتابیس + ساخت `.env` + مایگریشن‌ها + داده اولیه).
-- **به‌روزرسانی:** زیپ نسخه جدید را روی نسخه قبلی استخراج کن و `update.php` را با `APP_KEY` اجرا کن.
+- فایل‌های **public** (SPA + `index.php` + `.htaccess`) را در web root ساب‌دامنه (مثلاً `/home/USER/public_html/xx.example.com`) قرار بده — `cpanel-public.zip`
+- فایل‌های **private** (کل برنامه Laravel + `vendor` + `.env`) را در یک مسیر قابل تنظیم خارج از web root (مثلاً `/home/USER/private_pro/project1/myc`) قرار بده — `cpanel-private.zip`
+- نصب‌کننده تحت وب `install.php` مسیر خصوصی را به‌صورت خودکار در `app-path.txt` ثبت می‌کند: اتصال دیتابیس + ساخت `.env` + مایگریشن‌ها + داده اولیه
+- **به‌روزرسانی:** زیپ‌های جدید را روی مسیرهای قبلی استخراج کن و `update.php` را با `APP_KEY` اجرا کن.
 - راهنمای کامل فارسی: [`deploy/cpanel/README.md`](deploy/cpanel/README.md)
 
 ### ساخت پکیج (توسعه‌دهنده)
-با push کردن تگ نسخه، GitHub Actions خودش پکیج را می‌سازد و به Release پیوست می‌کند:
+با push کردن تگ نسخه، GitHub Actions خودش پکیج‌ها را می‌سازد و به Release پیوست می‌کند:
 ```bash
 git tag v1.0.1 && git push origin v1.0.1
 ```
-بیلد لوکال: `bash deploy/cpanel/build.sh` (خروجی: `cpanel-release/cpanel-app.zip`)
+بیلد لوکال: `bash deploy/cpanel/build.sh` (خروجی: `cpanel-release/cpanel-public.zip` + `cpanel-private.zip`)
 
 ---
 

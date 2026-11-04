@@ -1,20 +1,25 @@
 # =====================================================================
-# فایل htaccess ریشه برای سناریوی B:
-# زمانی که کل برنامه (خروجی cpanel-app.zip) مستقیماً داخل public_html
-# استخراج شده باشد و امکان تغییر DocumentRoot وجود نداشته باشد.
+# ROOT .htaccess for single-folder mode (scenario B):
+# when the whole app is extracted directly into public_html and the
+# DocumentRoot cannot be changed.
 #
-# این محتوا را جایگزین فایل public_html/.htaccess کنید.
-# (این فایل با پسوند .txt قرار داده شده تا توسط آپاچی اجرا نشود)
+# Replace the content of public_html/.htaccess with this file.
+# (Stored with a .txt extension so Apache does not execute it.)
 # =====================================================================
 
-<Files ".env">
+# ---- Block private files ----
+<FilesMatch "^(app-path\.txt|\.env|\.env\..*|composer\.(json|lock)|artisan)$">
     Require all denied
-</Files>
+</FilesMatch>
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # تمام درخواست‌ها به پوشه public/ لاراول هدایت می‌شوند
+    # Forbid direct web access to private app folders (outside public/)
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(app|bootstrap|config|database|resources|routes|storage|tests|vendor)(/|$) - [F,L]
+
+    # Route all requests into the Laravel public/ folder
     RewriteCond %{REQUEST_URI} !^/public/
     RewriteRule ^(.*)$ public/$1 [L]
 </IfModule>

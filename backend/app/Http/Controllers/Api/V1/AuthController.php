@@ -279,7 +279,7 @@ class AuthController extends Controller
             minutes: 60 * 24 * 7, // 7 days
             path: '/',
             domain: null,
-            secure: false, // allow http in local/docker environment
+            secure: request()->isSecure(), // HTTPS on cPanel, plain HTTP on local/docker
             httpOnly: true,
             raw: false,
             sameSite: 'Lax'

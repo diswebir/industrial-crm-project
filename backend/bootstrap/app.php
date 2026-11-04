@@ -4,7 +4,11 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 
-return Application::configure(basePath: dirname(__DIR__))
+// Support split deployment (cPanel): when public/ lives in the web root and the
+// rest of the app lives in a configurable private path, public/index.php exports
+// APP_BASE_PATH / APP_PUBLIC_PATH before this file is loaded. Fall back to the
+// standard single-folder layout.
+$app = Application::configure(basePath: env('APP_BASE_PATH') ?: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
@@ -25,3 +29,12 @@ return Application::configure(basePath: dirname(__DIR__))
             return $request->is('api/*') || $request->expectsJson();
         });
     })->create();
+
+// In split deployment the web root is NOT basePath/public; point public_path()
+// at the real web root so the public disk (uploads) and assets resolve correctly.
+$publicPath = env('APP_PUBLIC_PATH');
+if ($publicPath && is_dir($publicPath)) {
+    $app->usePublicPath(rtrim($publicPath, '/'));
+}
+
+return $app;

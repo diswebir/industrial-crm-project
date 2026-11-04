@@ -5,120 +5,130 @@
 
 ---
 
-## 📦 پکیج شامل چیست؟
+## 🗂️ ساختار Split (پیشنهادی) — public جدا از private
 
-`cpanel-app.zip` (ساخته‌شده توسط `deploy/cpanel/build.sh` یا GitHub Actions):
+سامانه طوری طراحی شده که **فایل‌های عمومی (public)** و **فایل‌های خصوصی (private)** در دو مسیر کاملاً جدا و قابل تنظیم قرار بگیرند:
 
-| بخش | توضیح |
-|---|---|
-| برنامه Laravel 11 | با پوشه `vendor` کامل — بدون نیاز به composer روی هاست |
-| فرانت‌اند React | بیلدشده و قرارگرفته در `public/` (index.html + assets) |
-| `public/install.php` | 🔰 نصب‌کننده تحت وب: اتصال دیتابیس، ساخت `.env`، اجرای مایگریشن‌ها و داده اولیه |
-| `public/update.php` | 🔄 اجرای مایگریشن‌های جدید هنگام به‌روزرسانی نسخه قبلی |
-| `public/setup-check.php` | 🩺 بررسی سلامت محیط (بعد از نصب حذف شود) |
-| `.env.cpanel.example` | قالب تنظیمات (برای روش نصب دستی) |
-| `_cpanel-root-htaccess.txt` | برای وقتی که برنامه داخل `public_html` نصب می‌شود |
+```
+/home/USER/public_html/xx.example.com/        ← web root (DocumentRoot ساب‌دامنه xx.example.com)
+│   ├── index.html, assets/, css/, js/, fonts/    ← cpanel-public.zip
+│   ├── index.php                                 ← فرانت‌کنترلر Laravel ( app-path.txt را می‌خواند)
+│   ├── .htaccess                                 ← مسیریابی SPA + API + مسدودسازی فایل‌های حساس
+│   ├── install.php  /  update.php  /  setup-check.php
+│   └── storage/                                  ← آپلودها (public/storage)
+│
+/home/USER/private_pro/project1/myc/          ← مسیر خصوصی (کاملاً خارج از web root — قابل تنظیم)
+│   ├── app/  bootstrap/  config/  routes/  resources/  database/
+│   ├── vendor/                                   ← کامل، بدون نیاز به composer
+│   ├── storage/  .env  artisan  composer.json   ← cpanel-private.zip
+```
 
-`crm-database.sql` (کنار زیپ در Release) فقط برای **روش نصب دستی** لازم است — با نصب‌کننده وب دیگر نیازی به آن نیست.
+- مسیر خصوصی **هرجایی** می‌تواند باشد؛ فقط کافی است در زمان نصب در فرم نصب‌کننده وارد شود.
+- نصب‌کننده به‌صورت خودکار فایل `app-path.txt` را کنار `index.php` می‌نویسد تا برنامه مسیر خصوصی را پیدا کند.
+- چون پوشه private خارج از web root است، کدها، `.env` و `storage` به‌صورت پیش‌فرض از وب **غیرقابل دسترس** هستند.
+
+---
+
+## 📦 پکیج‌های نصب
+
+| فایل | مقصد | محتوا |
+|---|---|---|
+| `cpanel-public.zip` | web root (DocumentRoot) | SPA build شده، `index.php`، `.htaccess`، `install.php`، `update.php`، `setup-check.php`، `app-path.example.txt`، پوشه `storage/` |
+| `cpanel-private.zip` | مسیر خصوصی قابل تنظیم | کل برنامه Laravel + `vendor` کامل + `.env.cpanel.example` |
+
+> برای حالت تک‌پوشه‌ای (قدیمی): با `CPANEL_COMBINED=1 bash deploy/cpanel/build.sh` پکیج `cpanel-app.zip` هم ساخته می‌شود.
 
 ---
 
 ## ✅ پیش‌نیازهای هاست
 
 1. **PHP نسخه 8.2+** (تست‌شده روی 8.4) — از **MultiPHP Manager**
-2. **MySQL + phpMyAdmin** — تقریباً همه هاست‌های cPanel
+2. **MySQL + phpMyAdmin**
 3. افزونه‌های PHP (از **Select PHP Version → Extensions**):
    ضروری: `pdo_mysql` ، `mbstring` ، `openssl` ، `fileinfo` ، `curl` ، `tokenizer` ، `xml`
    پیشنهادی: `gd` ، `intl` ، `zip`
-4. File Manager با قابلیت آپلود/Extract زیپ ~۲۰ مگابایتی
+4. File Manager با قابلیت آپلود/Extract زیپ
 
 ---
 
-## 🗺️ انتخاب محل نصب
+## 🟢 نصب گام‌به‌گام (روش Split — پیشنهادی)
 
-| | سناریو A (ترجیحی ⭐) | سناریو B |
-|---|---|---|
-| شرط | بتوانی **DocumentRoot** را عوض کنی (برای Subdomain / Addon Domain در بیشتر cPanelها ممکن است) | DocumentRoot قفل است روی `public_html` |
-| محل نصب | خارج از `public_html` مثل `/home/USER/crm-app` | مستقیماً داخل `public_html` |
-
-> 💡 ساده‌ترین راه برای سناریو A: یک **ساب‌دامنه** مثل `crm.yoursite.ir` بساز و DocumentRoot آن را مشخص کن.
-
----
-
-## 🟢 روش ۱ — نصب با نصب‌کننده وب (پیشنهادی)
-
-### گام ۱ — ساخت دیتابیس
-cPanel → **MySQL® Database Wizard** → نام دیتابیس و کاربر + رمز قوی بساز → **ALL PRIVILEGES**.
-*(فقط دیتابیس خالی لازم است — جدول‌ها را خود نصب‌کننده می‌سازد.)*
+### گام ۱ — ساخت ساب‌دامنه و مسیرها
+1. در cPanel → **Domains → Subdomains** یک ساب‌دامنه بساز؛ مثلاً `xx.example.com`
+   - DocumentRoot آن را روی یک پوشه مثل `/home/USER/public_html/xx.example.com` بگذار.
+2. با **File Manager** پوشه_private خارج از web root بساز؛ مثلاً:
+   `/home/USER/private_pro/project1/myc`
 
 ### گام ۲ — آپلود و استخراج
-**سناریو A:** در File Manager یک پوشه `crm-app` بالای `public_html` بساز → `cpanel-app.zip` را آپلود و همان‌جا **Extract** کن → زیپ را حذف کن → در بخش Subdomains مقدار Document Root را روی `/home/USER/crm-app/public` بگذار.
+1. `cpanel-private.zip` را در `/home/USER/private_pro/project1/myc` آپلود و **Extract** کن؛ سپس فایل زیپ را حذف کن.
+2. `cpanel-public.zip` را در `/home/USER/public_html/xx.example.com` (web root) آپلود و **Extract** کن؛ سپس فایل زیپ را حذف کن.
 
-**سناریو B:** زیپ را داخل `public_html` آپلود و Extract کن → زیپ را حذف کن → محتوای `_cpanel-root-htaccess.txt` را جایگزین `public_html/.htaccess` کن.
+### گام ۳ — ساخت دیتابیس
+cPanel → **MySQL® Database Wizard** → دیتابیس خالی + کاربر + رمز قوی → **ALL PRIVILEGES**.
+*(جدول‌ها را خود نصب‌کننده می‌سازد — Import دستی لازم نیست.)*
 
-### گام ۳ — اجرای نصب‌کننده
-در مرورگر باز کن: `https://دامنه/install.php`
+### گام ۴ — اجرای ویزارد نصب
+در مرورگر باز کن:
 
-1. جدول بررسی پیش‌نیازها را ببین (همه باید ✅ باشند)
+```
+https://xx.example.com/install.php
+```
+
+1. جدول «بررسی محیط» را ببین — همه باید ✅ باشند.
 2. فرم را پر کن:
-   - **آدرس کامل سایت:** `https://crm.yoursite.ir`
-   - **host / پورت:** `127.0.0.1` و `3306`
-   - **نام دیتابیس / کاربر / رمز:** همان‌هایی که در گام ۱ ساختی (مثل `youruser_crmdb`)
-3. دکمه **«شروع نصب»** را بزن → مایگریشن‌ها و داده اولیه اجرا می‌شود
-4. `APP_KEY` یکتا تولید و `.env` ساخته می‌شود — و `install.php` خودش را حذف می‌کند ✅
+   - **آدرس سایت:** `https://xx.example.com`
+   - **مسیر خصوصی برنامه:** `/home/USER/private_pro/project1/myc`
+   - host/پورت/نام/کاربر/رمز دیتابیس
+3. دکمه **«شروع نصب»** را بزن:
+   - `app-path.txt` کنار `index.php` نوشته می‌شود ✅
+   - `.env` با `APP_KEY` یکتا در مسیر خصوصی ساخته می‌شود ✅
+- مایگریشن‌ها + داده اولیه اجرا می‌شوند ✅
+   - `install.php` خودش را حذف می‌کند ✅
 
-### گام ۴ — اولین ورود
-- آدرس سایت → ورود با `admin@crm.local` / `Admin@123456`
-- تست کن: داشبورد، مشتریان (جستجوی «سارا»)، قطعات، پیامک، `/admin` (پنل Filament)، `/docs/api`
-
-> ⚠️ **فوراً رمز ادمین را عوض کن** (پروفایل من → تغییر کلمه عبور).
-
----
-
-## 🔵 روش ۲ — نصب دستی (بدون نصب‌کننده)
-
-1. دیتابیس بساز (مثل گام ۱ بالا)
-2. **phpMyAdmin** → دیتابیس را انتخاب → تب Import → فایل `crm-database.sql` → Go (باید ۲۲ جدول ساخته شود)
-3. زیپ را طبق سناریو A یا B استخراج کن
-4. در File Manager (با **Show Hidden Files**) فایل `.env.cpanel.example` را به `.env` تغییر نام بده و **Edit** کن:
-   ```env
-   APP_URL=https://crm.yoursite.ir
-   DB_DATABASE=youruser_crmdb
-   DB_USERNAME=youruser_crmuser
-   DB_PASSWORD=رمز-دیتابیس
-   ```
-5. `https://دامنه/setup-check.php` را باز کن — همه باید سبز باشد (بعدش حذفش کن)
+### گام ۵ — اولین ورود
+- `https://xx.example.com` → ورود با `admin@crm.local` / `Admin@123456`
+- تست: داشبورد، مشتریان، قطعات، پیامک، `/admin` (Filament)، `/docs/api`
+- ⚠️ **فوراً رمز ادمین را عوض کن.**
 
 ---
 
-## 🔁 به‌روزرسانی نسخه نصب‌شده (خیلی مهم)
+## 🔵 حالت تک‌پوشه‌ای (DocumentRoot قابل تغییر نیست)
 
-وقتی نسخه جدیدی از برنامه آمد (Release جدید در گیت‌هاب):
+اگر فقط بتوانی DocumentRoot را روی `public_html` نگه دارید:
 
-1. **بکاپ بگیر:** phpMyAdmin → Export + یک کپی از `.env` و پوشه `public/storage`
-2. زیپ جدید را **روی نسخه قبلی** استخراج کن (Extract در همان محل نصب) — فایل‌ها جایگزین می‌شوند
-   - ⚠️ نگران `.env` نباش: در زیپ دیتابیس-محور نیست و رونویسی نمی‌شود
-   - ⚠️ فایل‌های آپلودشده (`public/storage`) و سوابق (`storage`) با extract از بین نمی‌روند
-3. مقدار `APP_KEY` را از فایل `.env` کپی کن و این آدرس را باز کن:
+1. `cpanel-app.zip` (ساخته‌شده با `CPANEL_COMBINED=1`) را داخل `public_html` استخراج کن.
+2. محتوای `_cpanel-root-htaccess.txt` را جایگزین `public_html/.htaccess` کن
+   (این فایل مسیرهای private مثل `vendor/` و `storage/` را با 403 مسدود می‌کند).
+3. همان گام‌های ۳ و ۴ بالا را انجام بده؛ در فرم، مسیر خصوصی را همان
+   `/home/USER/public_html` وارد کن (یا خالی بگذار تا به‌صورت خودکار parent of public/ تشخیص داده شود).
+
+---
+
+## 🔁 به‌روزرسانی نسخه
+
+1. **بکاپ:** phpMyAdmin → Export + کپی از `.env` و پوشه‌های `storage/` (private) و `public/storage`.
+2. زیپ‌های جدید را روی مسیرهای قبلی استخراج کن (overwrite):
+   - `cpanel-private.zip` → همان مسیر خصوصی قبلی
+   - `cpanel-public.zip` → همان web root قبلی
+   - ⚠️ نگران `.env` و `app-path.txt` نباش — در زیپ‌ها نیستند و رونویسی نمی‌شوند.
+3. مقدار `APP_KEY` را از `.env` (در مسیر خصوصی) کپی کن و باز کن:
    ```
-   https://دامنه/update.php?key=APP_KEY
+   https://xx.example.com/update.php?key=APP_KEY
    ```
-4. وضعیت مایگریشن‌ها را می‌بینی → دکمه **اجرای مایگریشن‌ها** را بزن
-5. تمام — `update.php` بعد از اجرا خودش را حذف می‌کند
-
-> اگر نسخه جدید **فقط تغییر فرانت/ظاهر** داشته باشد و مایگریشن جدیدی نباشد، مرحله ۳-۴ لازم نیست؛ کافی است استخراج کنی و `Ctrl+F5` بزنی.
+4. دکمه «اجرای مایگریشن‌ها» را بزن → `update.php` خودش را حذف می‌کند.
 
 ---
 
 ## 🔐 چک‌لیست امنیتی بعد از نصب
 
 - [ ] رمز `admin@crm.local` تغییر کرد
-- [ ] `install.php` حذف شد (نصب‌کننده خودکار حذفش می‌کند — مطمئن شو)
-- [ ] `setup-check.php` از پوشه `public` حذف شد
-- [ ] `update.php` حذف شد (بعد از هر استفاده)
-- [ ] SSL رایگان فعال شد: cPanel → **SSL/TLS Status** → **Run AutoSSL**
-- [ ] `APP_URL` دقیقاً همان دامنه‌ای است که باز می‌کنی (www و بدون www یکی نیستند)
+- [ ] `install.php` حذف شد (خودکار حذف می‌شود — مطمئن شو)
+- [ ] `setup-check.php` از web root حذف شد
+- [ ] `update.php` بعد از هر استفاده حذف شد
+- [ ] SSL رایگان فعال شد (cPanel → SSL/TLS Status → Run AutoSSL)
+- [ ] `APP_URL` دقیقاً همان دامنه‌ای است که باز می‌کنی
 - [ ] بکاپ اولیه دیتابیس گرفته شد
+- [ ] دسترسی پوشه‌های private روی 755 و فایل `.env` روی 640 است
 
 ---
 
@@ -126,62 +136,48 @@ cPanel → **MySQL® Database Wizard** → نام دیتابیس و کاربر +
 
 | مشکل | علت | راه‌حل |
 |---|---|---|
-| نصب‌کننده: «اتصال ناموفق» | اطلاعات دیتابیس غلط / دیتابیس نساختی | مقادیر را با MySQL Databases در cPanel مقایسه کن (پیشوند حساب فراموش نشود: `youruser_...`) |
-| نصب‌کننده: خطای مایگریشن | جدول تکراری از ایمپورت قبلی | جداول را از phpMyAdmin حذف و دوباره تلاش کن |
-| صفحه 500 | خطای برنامه | `storage/logs/laravel.log` را از File Manager بخوان |
+| نصب‌کننده: «vendor یافت نشد» | مسیر خصوصی اشتباه است | مسیر `/home/USER/private_pro/project1/myc` را در فرم درست وارد کن و مطمئن شو `cpanel-private.zip` همان‌جا extract شده |
+| صفحه 500 | مسیر خصوصی با app-path.txt پیدا نمی‌شود | فایل `app-path.txt` کنار `index.php` را چک کن؛ یا `APP_BASE_PATH` را در PHP Manager ست کن |
 | «could not find driver» | `pdo_mysql` خاموش | Select PHP Version → Extensions |
 | صفحه سفید | PHP < 8.2 | MultiPHP Manager → 8.2+ |
-| بعد از لاگین بیرون می‌اندازد | `APP_URL` ناهماهنگ با دامنه باز‌شده | `.env` را اصلاح کن |
+| بعد از لاگین بیرون می‌اندازد | `APP_URL` ناهماهنگ | `.env` را اصلاح کن |
+| deep-link 404 (مثل /customers) | htaccess قدیمی | محتوای `deploy/cpanel/htaccess/public.htaccess` را در web root کپی کن |
+| خطای 419/session | storage غیرقابل‌نوشتن | پوشه‌های `storage` و `bootstrap/cache` در مسیر خصوصی → 775 |
 | آپلود آواتار/اکسل خطا | محدودیت PHP | MultiPHP INI Editor → `upload_max_filesize=12M` و `post_max_size=12M` |
-| deep-link 404 (مثل /customers) | htaccess قدیمی | `deploy/cpanel/htaccess/public.htaccess` را در `public/.htaccess` بگذار |
-| خطای 419/session | storage غیرقابل‌نوشتن | پوشه `storage` و `bootstrap/cache` → 775 |
-| پیامک واقعی ارسال نمی‌شود | حالت Sandbox روشن | برنامه → تنظیمات → ملی‌پیامک → اطلاعات را وارد کن و Sandbox را خاموش کن |
+| پیامک واقعی ارسال نمی‌شود | Sandbox روشن | تنظیمات → ملی‌پیامک → اطلاعات را وارد کن و Sandbox را خاموش کن |
 
 ---
 
 ## 🛠️ ساخت پکیج (توسعه‌دهنده)
 
-### روش ۱ — خودکار با GitHub Actions (پیشنهادی)
-هر بار تگ نسخه push کنی، پکیج ساخته و به Release پیوست می‌شود:
-```bash
-git add -A
-git commit -m "your changes"
-git push
-git tag v1.0.1
-git push origin v1.0.1
-# → در صفحه GitHub → Releases فایل cpanel-app.zip و crm-database.sql ظاهر می‌شود
-```
-اجرای دستی هم از تب **Actions → Build cPanel Package → Run workflow** ممکن است.
-
-### روش ۲ — لوکال (Linux / macOS / WSL)
 ```bash
 bash deploy/cpanel/build.sh
-# خروجی: cpanel-release/cpanel-app.zip
+# خروجی در cpanel-release/:
+#   cpanel-public.zip + cpanel-private.zip   (پیش‌فرض)
+#   cpanel-app.zip                            (با CPANEL_COMBINED=1)
 ```
-پیش‌نیاز: PHP 8.2+ و Composer و Node 18+ و `zip`.
 
-### ساخت `crm-database.sql` لوکال (فقط برای روش نصب دستی)
-```bash
-cd backend
-cp .env.example .env   # سپس DB_* را روی MySQL محلی تنظیم کن
-php artisan key:generate
-php artisan migrate:fresh --seed
-mysqldump --add-drop-table -u USER -p DBNAME > ../cpanel-release/crm-database.sql
-```
+پیش‌نیاز: PHP 8.2+ و Composer و Node 18+ و `zip`.
 
 ---
 
-## 📁 نقشه فایل‌های استقرار (داخل ریپو)
+## 📁 نقشه فایل‌های استقرار
 
 ```
 deploy/cpanel/
 ├── README.md               ← همین راهنما
-├── build.sh                ← اسکریپت ساخت پکیج (لوکال + GitHub Actions)
-├── install.php             ← نصب‌کننده تحت وب (به public کپی می‌شود)
-├── update.php              ← اجرای مایگریشن هنگام آپدیت (به public کپی می‌شود)
-├── setup-check.php         ← بررسی سلامت محیط (به public کپی می‌شود)
-├── env.cpanel.example      ← قالب .env production (APP_KEY موقع بیلد ساخته می‌شود)
+├── build.sh                ← اسکریپت ساخت پکیج‌های public/private
+├── install.php             ← ویزارد نصب تحت وب (به web root کپی می‌شود)
+├── update.php              ← اجرای مایگریشن هنگام آپدیت (به web root کپی می‌شود)
+├── setup-check.php         ← بررسی سلامت محیط (به web root کپی می‌شود)
+├── env.cpanel.example      ← قالب .env (APP_KEY موقع build ساخته می‌شود)
 └── htaccess/
-    ├── public.htaccess     ← مسیریابی SPA + API داخل public/
-    └── root.htaccess       ← هدایت همه به public/ (نصب داخل public_html)
+    ├── public.htaccess     ← web root (مسیریابی SPA + API + deny فایل‌های حساس)
+    └── root.htaccess       ← حالت تک‌پوشه‌ای داخل public_html (404/403 روی مسیرهای private)
+```
+
+```
+backend/public/
+├── index.php               ← فرانت‌کنترلر؛ مسیر private را از app-path.txt / APP_BASE_PATH می‌خواند
+└── app-path.example.txt    ← نمونه فایل اشاره‌گر مسیر خصوصی
 ```

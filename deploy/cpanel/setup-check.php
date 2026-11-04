@@ -9,7 +9,22 @@
 header('Content-Type: text/html; charset=utf-8');
 header('X-Robots-Tag: noindex');
 
-$baseDir = dirname(__DIR__); // Laravel root
+$publicDir = __DIR__;
+
+/* Resolve the private app root: app-path.txt pointer → APP_BASE_PATH env → parent of public/ */
+function crm_resolve_app_base(string $publicDir): string
+{
+    $pointer = $publicDir . '/app-path.txt';
+    if (is_file($pointer)) {
+        $p = rtrim(trim((string) file_get_contents($pointer)), '/');
+        if ($p !== '' && is_dir($p)) return $p;
+    }
+    $env = getenv('APP_BASE_PATH');
+    if ($env && is_dir($env)) return rtrim($env, '/');
+    return dirname($publicDir);
+}
+
+$baseDir = crm_resolve_app_base($publicDir); // private Laravel root
 
 $requiredExtensions = ['pdo_mysql', 'mbstring', 'openssl', 'fileinfo', 'curl', 'tokenizer', 'xml', 'ctype', 'json'];
 $recommendedExtensions = ['gd', 'intl', 'zip', 'bcmath'];
@@ -90,6 +105,7 @@ function row(string $label, string $status, string $detail = ''): string
     </thead>
     <tbody>
       <?php
+      echo row('مسیر خصوصی برنامه (app base)', 'info', $baseDir);
       echo row('نسخه PHP (حداقل 8.2)', version_compare(PHP_VERSION, '8.2.0', '>=') ? 'ok' : 'fail', PHP_VERSION);
       foreach ($requiredExtensions as $ext) {
           echo row('افزونه PHP: ' . $ext, extension_loaded($ext) ? 'ok' : 'fail', extension_loaded($ext) ? 'loaded' : 'در MultiPHP Manager فعال کنید');
@@ -98,10 +114,12 @@ function row(string $label, string $status, string $detail = ''): string
           echo row('افزونه پیشنهادی: ' . $ext, extension_loaded($ext) ? 'ok' : 'warn', extension_loaded($ext) ? 'loaded' : 'اختیاری — در صورت نبود، برخی قابلیت‌ها محدود می‌شود');
       }
       echo row('وجود فایل .env', $envExists ? 'ok' : 'fail', $envExists ? '.env' : 'فایل .env در ریشه برنامه یافت نشد');
-      foreach (['storage', 'storage/app', 'storage/framework', 'storage/logs', 'bootstrap/cache', 'public/storage'] as $dir) {
+      foreach (['storage', 'storage/app', 'storage/framework', 'storage/logs', 'bootstrap/cache'] as $dir) {
           $p = $baseDir . '/' . $dir;
-          echo row('قابل نوشتن: ' . $dir, (is_dir($p) && is_writable($p)) ? 'ok' : 'fail', $p);
+          echo row('قابل نوشتن (private): ' . $dir, (is_dir($p) && is_writable($p)) ? 'ok' : 'fail', $p);
       }
+      $pubStorage = $publicDir . '/storage';
+      echo row('قابل نوشتن (web root): storage', (is_dir($pubStorage) && is_writable($pubStorage)) ? 'ok' : 'fail', $pubStorage);
       echo row('اتصال دیتابیس MySQL', $dbStatus, $dbMessage);
       echo row('APP_KEY', envValue($envPath, 'APP_KEY') ? 'ok' : 'fail', envValue($envPath, 'APP_KEY') ? 'تنظیم شده' : 'در .env تنظیم نشده');
       ?>
