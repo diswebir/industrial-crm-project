@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { MAIN_NAV, SETTINGS_NAV } from './nav'
 import { useAuthStore } from '../store/useAuthStore'
+import { APP_VERSION } from '../version'
 import { Avatar } from '../components/ui/Avatar'
 import { settingsApi } from '../services/api'
 import { cx } from '../utils/format'
@@ -23,7 +24,7 @@ export function Logo({ size = 'md' }: { size?: 'md' | 'lg' }) {
     staleTime: 5 * 60 * 1000,
   })
 
-  const companyName = companySettings?.company_name || 'سی‌آر‌ام قطعات'
+  const companyName = companySettings?.company_name || 'سامانه CRM صنعتی'
   const logoUrl = companySettings?.company_logo_url
 
   return (
@@ -203,6 +204,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
                 <p className="text-[10px] text-base-content/50 truncate font-mono">{user.email}</p>
               </div>
             </NavLink>
+            <p className="mt-2 text-center text-[10px] text-base-content/35 font-mono">v{APP_VERSION}</p>
           </div>
         )}
 

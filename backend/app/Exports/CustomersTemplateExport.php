@@ -58,7 +58,7 @@ class CustomersTemplateExport implements FromArray, WithHeadings, ShouldAutoSize
                 'اصفهان',
                 'نجف‌آباد',
                 'بلوار صنعت، کوچه امید',
-                'علاقه‌مند به تهیه قطعه پمپ هیدرولیک',
+                'علاقه‌مند به تهیه دستگاه پمپ هیدرولیک',
             ],
         ];
     }

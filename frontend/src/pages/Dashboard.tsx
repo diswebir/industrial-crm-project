@@ -10,6 +10,7 @@ import {
   UserCheck,
   UserPlus,
   Users,
+  Warehouse,
   Wrench,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -35,6 +36,8 @@ export default function Dashboard() {
     potential_customers: 0,
     total_parts: 0,
     assigned_parts: 0,
+    assigned_devices: 0,
+    total_stock: 0,
     total_sms_sent: 0,
   };
 
@@ -44,7 +47,7 @@ export default function Dashboard() {
     <div className="space-y-6">
       <PageHeader
         title={`سلام، ${user?.name || "کاربر گرامی"} 👋`}
-        subtitle={`${weekdayFa(today)}، ${dateFa(today)} — خلاصه وضعیت مدیریت قطعات و مشتریان`}
+        subtitle={`${weekdayFa(today)}، ${dateFa(today)} — خلاصه وضعیت مدیریت دستگاه‌ها، انبار و مشتریان`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Can permission="customers.create">
@@ -68,7 +71,7 @@ export default function Dashboard() {
       />
 
       {/* KPI Stats Grid - All linked to their respective pages */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
         <StatCard
           title="کل مشتریان"
           value={num(stats.total_customers)}
@@ -83,7 +86,7 @@ export default function Dashboard() {
           value={num(stats.effective_customers)}
           icon={UserCheck}
           tone="success"
-          hint="دارای قطعه فیزیکی"
+          hint="دارای دستگاه فیزیکی"
           loading={isLoading}
           to="/customers?type=effective"
         />
@@ -97,7 +100,7 @@ export default function Dashboard() {
           to="/customers?type=potential"
         />
         <StatCard
-          title="مدل‌های قطعات"
+          title="مدل‌های دستگاه‌ها"
           value={num(stats.total_parts)}
           icon={Cpu}
           tone="secondary"
@@ -106,13 +109,22 @@ export default function Dashboard() {
           to="/parts"
         />
         <StatCard
-          title="قطعات تخصیص‌یافته"
-          value={num(stats.assigned_parts)}
+          title="دستگاه‌های تخصیص‌یافته"
+          value={num(stats.assigned_devices ?? stats.assigned_parts)}
           icon={Boxes}
           tone="primary"
-          hint="دارای شماره سریال یکتا"
+          hint={`${num(stats.assigned_parts)} پرونده تخصیص`}
           loading={isLoading}
-          to="/parts"
+          to="/customers"
+        />
+        <StatCard
+          title="موجودی انبار"
+          value={num(stats.total_stock ?? 0)}
+          icon={Warehouse}
+          tone="warning"
+          hint="ورود / خروج و تاریخچه انبار"
+          loading={isLoading}
+          to="/inventory"
         />
         <StatCard
           title="پیامک‌های ارسالی"
@@ -280,10 +292,11 @@ export default function Dashboard() {
               خط‌مشی گارانتی و سرویس دوره‌ای
             </h4>
             <p className="mt-2 text-xs text-indigo-900 leading-relaxed dark:text-indigo-300">
-              سرویس‌های دوره‌ای قطعات اجباری نبوده و به عنوان پوشش گارانتی
+              سرویس‌های دوره‌ای دستگاه‌ها اجباری نبوده و به عنوان پوشش گارانتی
               اختیاری شرکت برای مشتریان در نظر گرفته می‌شود. هر زمان مشتری
-              نیازمند تعمیر یا بررسی قطعه باشد، سابقه آن در پرونده قطعه با کد
-              رهگیری ثبت می‌گردد.
+              نیازمند تعمیر یا بررسی دستگاه باشد، سابقه آن در پرونده دستگاه با
+              کد رهگیری ثبت می‌گردد و در صورت تعویض، تعداد انبار به‌صورت
+              خودکار به‌روزرسانی می‌شود.
             </p>
           </div>
         </div>

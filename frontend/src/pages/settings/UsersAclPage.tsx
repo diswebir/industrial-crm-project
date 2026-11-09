@@ -168,6 +168,14 @@ export default function UsersAclPage() {
                                 <span className="badge badge-xs bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/50 dark:text-amber-300">
                                   مدیر ارشد
                                 </span>
+                              ) : u.user_type === 'salesperson' ? (
+                                <span className="badge badge-xs bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/50 dark:text-blue-300">
+                                  کارمند فروش
+                                </span>
+                              ) : u.user_type === 'installer' ? (
+                                <span className="badge badge-xs bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300">
+                                  نصاب
+                                </span>
                               ) : (
                                 <span className="badge badge-xs bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300">
                                   مدیر
@@ -176,6 +184,23 @@ export default function UsersAclPage() {
                             </div>
                             <p className="text-[11px] text-base-content/50 mt-0.5">
                               عضویت: {u.created_at ? `${dateFa(u.created_at)} (${dateShort(u.created_at)})` : '—'}
+                            </p>
+                            <p className="text-[10px] mt-0.5">
+                              <span
+                                className={cx(
+                                  'badge badge-xs badge-ghost font-semibold',
+                                  u.data_scope === 'all' && 'text-emerald-700 dark:text-emerald-400',
+                                  u.data_scope === 'own' && 'text-blue-700 dark:text-blue-400',
+                                  u.data_scope === 'custom' && 'text-amber-700 dark:text-amber-400',
+                                )}
+                              >
+                                دامنه دید:{' '}
+                                {u.data_scope === 'own'
+                                  ? 'فقط مشتریان خودش'
+                                  : u.data_scope === 'custom'
+                                    ? 'خودش + استثناها'
+                                    : 'تمام مشتریان'}
+                              </span>
                             </p>
                           </div>
                         </div>

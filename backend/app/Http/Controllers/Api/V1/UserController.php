@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\CustomerAccessGrant;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Permission;
@@ -19,14 +21,42 @@ class UserController extends Controller
         'customers.delete' => 'حذف مشتری',
         'customers.import' => 'ورود گروهی با اکسل',
         'customers.export' => 'خروجی اکسل مشتریان',
-        'parts.view' => 'مشاهده قطعات',
-        'parts.manage' => 'مدیریت و ثبت قطعات',
-        'parts.assign' => 'تخصیص قطعه به مشتری',
-        'parts.history' => 'ثبت سوابق خدمات قطعات',
+        'parts.view' => 'مشاهده دستگاه‌ها',
+        'parts.manage' => 'مدیریت و ثبت کاتالوگ دستگاه‌ها',
+        'parts.assign' => 'تخصیص دستگاه به مشتری',
+        'parts.assign.edit' => 'ویرایش دستگاه تخصیص‌یافته',
+        'parts.assign.delete' => 'حذف دستگاه تخصیص‌یافته',
+        'parts.history' => 'ثبت سوابق خدمات دستگاه‌ها',
+        'inventory.view' => 'مشاهده موجودی و تاریخچه انبار',
+        'inventory.manage' => 'ثبت ورود/خروج و اصلاح موجودی انبار',
         'sms.send' => 'ارسال پیامک الگو',
         'sms.logs' => 'مشاهده سوابق پیامک',
         'users.manage' => 'مدیریت کاربران و دسترسی‌ها',
         'settings.manage' => 'مدیریت تنظیمات سیستم',
+    ];
+
+    /**
+     * مجوزهای پیشنهادی هر نقش سازمانی (Pure ACL باقی می‌ماند؛ فقط انتخاب اولیه آسان‌تر می‌شود).
+     */
+    public const ROLE_PRESETS = [
+        'salesperson' => [
+            'customers.view',
+            'customers.create',
+            'customers.edit',
+            'parts.view',
+            'parts.assign',
+            'parts.assign.edit',
+            'parts.assign.delete',
+            'parts.history',
+            'inventory.view',
+            'sms.send',
+        ],
+        'installer' => [
+            'customers.view',
+            'parts.view',
+            'parts.history',
+            'inventory.view',
+        ],
     ];
 
     public function index(): JsonResponse
@@ -54,10 +84,37 @@ class UserController extends Controller
                 'avatar_url' => $u->avatar_url,
                 'is_active' => $u->is_active,
                 'user_type' => $u->user_type,
+                'user_type_label' => $u->userTypeLabel(),
+                'data_scope' => $u->data_scope ?? 'all',
                 'created_at' => $u->created_at?->format('Y-m-d H:i'),
                 'permissions' => $u->getAllPermissions()->pluck('name')->values()->all(),
             ];
         });
+
+        return response()->json($users);
+    }
+
+    /**
+     * فهرست کارمندان برای انتخاب در بخش «دسترسی به مشتریان یک کارمند دیگر».
+     */
+    public function staffOptions(): JsonResponse
+    {
+        $this->authorizePermission('users.manage');
+
+        $callingUser = auth()->user();
+
+        $users = User::query()
+            ->where('is_active', true)
+            ->when($callingUser, fn ($q) => $q->where('id', '!=', $callingUser->id))
+            ->orderBy('name')
+            ->get(['id', 'name', 'user_type', 'email'])
+            ->map(fn (User $u) => [
+                'id' => $u->id,
+                'name' => $u->name,
+                'email' => $u->email,
+                'user_type' => $u->user_type,
+                'user_type_label' => $u->userTypeLabel(),
+            ]);
 
         return response()->json($users);
     }
@@ -71,6 +128,10 @@ class UserController extends Controller
             abort(403, 'مدیران عادی دسترسی به اطلاعات حساب مدیر ارشد را ندارند.');
         }
 
+        $grants = CustomerAccessGrant::query()
+            ->where('user_id', $user->id)
+            ->get(['scope_type', 'target_user_id', 'customer_id']);
+
         return response()->json([
             'id' => $user->id,
             'name' => $user->name,
@@ -80,8 +141,15 @@ class UserController extends Controller
             'avatar_url' => $user->avatar_url,
             'is_active' => $user->is_active,
             'user_type' => $user->user_type,
+            'user_type_label' => $user->userTypeLabel(),
+            'data_scope' => $user->data_scope ?? 'all',
             'created_at' => $user->created_at?->format('Y-m-d H:i'),
             'permissions' => $user->getAllPermissions()->pluck('name')->values()->all(),
+            'customer_access' => [
+                'scope' => $user->data_scope ?? 'all',
+                'staff_ids' => $grants->where('scope_type', CustomerAccessGrant::SCOPE_STAFF)->pluck('target_user_id')->filter()->values()->all(),
+                'customer_ids' => $grants->where('scope_type', CustomerAccessGrant::SCOPE_CUSTOMER)->pluck('customer_id')->filter()->values()->all(),
+            ],
         ]);
     }
 
@@ -98,7 +166,8 @@ class UserController extends Controller
             'avatar' => 'nullable|image|max:3072',
             'permissions' => 'nullable|array',
             'permissions.*' => 'string|exists:permissions,name',
-            'user_type' => 'nullable|in:administrator,manager',
+            'user_type' => 'nullable|in:administrator,manager,salesperson,installer',
+            'data_scope' => 'nullable|in:all,own,custom',
         ], [
             'name.required' => 'نام و نام خانوادگی کاربر الزامی است.',
             'email.required' => 'آدرس ایمیل الزامی است.',
@@ -113,38 +182,59 @@ class UserController extends Controller
             'avatar.max' => 'حداکثر حجم تصویر ۳ مگابایت است.',
         ]);
 
+        $callingUser = auth()->user();
+
         $avatarPath = null;
         if ($request->hasFile('avatar')) {
             $avatarPath = $request->file('avatar')->store('avatars', 'public');
         }
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'phone' => $validated['phone'] ?? null,
-            'avatar' => $avatarPath,
-            'password' => Hash::make($validated['password']),
-            'is_active' => $request->boolean('is_active', true),
-        ]);
-
         // Determine user_type: only administrators can create other administrators
-        $callingUser = auth()->user();
-        if ($callingUser && $callingUser->isAdministrator()) {
-            $resolvedType = $validated['user_type'] ?? 'manager';
-        } else {
+        $resolvedType = $validated['user_type'] ?? 'manager';
+        if ($resolvedType === 'administrator' && ! $callingUser?->isAdministrator()) {
             $resolvedType = 'manager';
         }
-        $user->user_type = $resolvedType;
-        $user->save();
-
-        if (!empty($validated['permissions'])) {
-            $requestedPerms = $validated['permissions'];
-            if ($callingUser && !$callingUser->isAdministrator()) {
-                $callerPerms = $callingUser->getAllPermissions()->pluck('name')->all();
-                $requestedPerms = array_values(array_intersect($requestedPerms, $callerPerms));
-            }
-            $user->syncPermissions($requestedPerms);
+        if (! in_array($resolvedType, User::USER_TYPES, true)) {
+            $resolvedType = 'manager';
         }
+
+        // دامنه دسترسی: نقش‌های عملیاتی به صورت پیش‌فرض فقط مشتریان خودشان را می‌بینند.
+        $defaultScope = in_array($resolvedType, ['salesperson', 'installer'], true) ? 'own' : 'all';
+        $resolvedScope = $validated['data_scope'] ?? $defaultScope;
+        if ($resolvedScope === 'all' && ! $callingUser?->isAdministrator()) {
+            $resolvedScope = $defaultScope;
+        }
+
+        $user = DB::transaction(function () use ($validated, $avatarPath, $resolvedType, $resolvedScope, $request) {
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'phone' => $validated['phone'] ?? null,
+                'avatar' => $avatarPath,
+                'password' => Hash::make($validated['password']),
+                'is_active' => $request->boolean('is_active', true),
+                'user_type' => $resolvedType,
+                'data_scope' => $resolvedScope,
+            ]);
+
+            return $user;
+        });
+
+        // Permissions: either explicit list or role preset
+        $requestedPerms = $validated['permissions'] ?? null;
+
+        if ($requestedPerms === null && isset(self::ROLE_PRESETS[$resolvedType])) {
+            $requestedPerms = self::ROLE_PRESETS[$resolvedType];
+        }
+
+        $requestedPerms = $requestedPerms ?? [];
+
+        if (! $callingUser?->isAdministrator()) {
+            $callerPerms = $callingUser ? $callingUser->getAllPermissions()->pluck('name')->all() : [];
+            $requestedPerms = array_values(array_intersect($requestedPerms, $callerPerms));
+        }
+
+        $user->syncPermissions(array_values(array_unique($requestedPerms)));
 
         return response()->json([
             'message' => 'کاربر جدید با دسترسی‌های تعیین‌شده با موفقیت ایجاد شد.',
@@ -157,6 +247,8 @@ class UserController extends Controller
                 'avatar_url' => $user->avatar_url,
                 'is_active' => $user->is_active,
                 'user_type' => $user->user_type,
+                'user_type_label' => $user->userTypeLabel(),
+                'data_scope' => $user->data_scope,
                 'permissions' => $user->getAllPermissions()->pluck('name')->values()->all(),
             ],
         ], 201);
@@ -180,7 +272,8 @@ class UserController extends Controller
             'avatar' => 'nullable|image|max:3072',
             'permissions' => 'nullable|array',
             'permissions.*' => 'string|exists:permissions,name',
-            'user_type' => 'nullable|in:administrator,manager',
+            'user_type' => 'nullable|in:administrator,manager,salesperson,installer',
+            'data_scope' => 'nullable|in:all,own,custom',
         ], [
             'name.required' => 'نام و نام خانوادگی کاربر الزامی است.',
             'email.required' => 'آدرس ایمیل الزامی است.',
@@ -223,22 +316,33 @@ class UserController extends Controller
             $user->avatar = $request->file('avatar')->store('avatars', 'public');
         }
 
-        $user->save();
-
         // Handle user_type update: only administrators can change user_type
-        $callingUser = auth()->user();
         if ($request->has('user_type') && $callingUser && $callingUser->isAdministrator()) {
             $newType = $validated['user_type'] ?? null;
-            if ($newType) {
+            if ($newType && in_array($newType, User::USER_TYPES, true)) {
                 // Ensure the root admin user remains administrator
                 if ($user->email === 'admin@crm.local') {
                     $user->user_type = 'administrator';
                 } else {
                     $user->user_type = $newType;
                 }
-                $user->save();
             }
         }
+
+        // دامنه دسترسی فقط توسط مدیر ارشد قابل تغییر است.
+        if ($request->has('data_scope') && $callingUser?->isAdministrator() && $user->email !== 'admin@crm.local') {
+            $newScope = $validated['data_scope'] ?? null;
+            if ($newScope && in_array($newScope, User::DATA_SCOPES, true)) {
+                $user->data_scope = $newScope;
+            }
+        }
+
+        // نقش‌های عملیاتی نباید بدون تصمیم مدیر، دسترسی «همه مشتریان» داشته باشند.
+        if (in_array($user->user_type, ['salesperson', 'installer'], true) && $user->data_scope === 'all' && ! $request->has('data_scope')) {
+            $user->data_scope = 'own';
+        }
+
+        $user->save();
 
         if ($request->has('permissions') || $request->has('sync_permissions')) {
             $requestedPerms = $validated['permissions'] ?? [];
@@ -268,6 +372,8 @@ class UserController extends Controller
                 'avatar_url' => $user->avatar_url,
                 'is_active' => $user->is_active,
                 'user_type' => $user->user_type,
+                'user_type_label' => $user->userTypeLabel(),
+                'data_scope' => $user->data_scope,
                 'permissions' => $user->getAllPermissions()->pluck('name')->values()->all(),
             ],
         ]);
@@ -303,8 +409,14 @@ class UserController extends Controller
         }
 
         $userName = $user->name;
-        $user->syncPermissions([]);
-        $user->delete();
+
+        DB::transaction(function () use ($user) {
+            // دسترسی‌های استثنا و مجوزها باید قبل از حذف پاک شوند.
+            CustomerAccessGrant::where('user_id', $user->id)->delete();
+            CustomerAccessGrant::where('target_user_id', $user->id)->delete();
+            $user->syncPermissions([]);
+            $user->delete();
+        });
 
         return response()->json([
             'message' => "کاربر «{$userName}» با موفقیت حذف گردید.",
@@ -326,7 +438,6 @@ class UserController extends Controller
         ]);
 
         $requestedPerms = $validated['permissions'];
-        $callingUser = auth()->user();
 
         if ($callingUser && !$callingUser->isAdministrator()) {
             $callerPerms = $callingUser->getAllPermissions()->pluck('name')->all();
@@ -344,6 +455,100 @@ class UserController extends Controller
         return response()->json([
             'message' => "مجوزهای کاربر «{$user->name}» با موفقیت بروزرسانی شد.",
             'permissions' => $user->getAllPermissions()->pluck('name')->values()->all(),
+        ]);
+    }
+
+    /**
+     * دامنه دسترسی مشتریان یک کارمند + استثناها (تسک ۱).
+     */
+    public function showCustomerAccess(User $user): JsonResponse
+    {
+        $this->authorizePermission('users.manage');
+
+        $grants = CustomerAccessGrant::query()
+            ->where('user_id', $user->id)
+            ->get(['scope_type', 'target_user_id', 'customer_id']);
+
+        return response()->json([
+            'scope' => $user->data_scope ?? 'all',
+            'staff_ids' => $grants->where('scope_type', CustomerAccessGrant::SCOPE_STAFF)->pluck('target_user_id')->filter()->values()->all(),
+            'customer_ids' => $grants->where('scope_type', CustomerAccessGrant::SCOPE_CUSTOMER)->pluck('customer_id')->filter()->values()->all(),
+        ]);
+    }
+
+    /**
+     * ذخیره دامنه دسترسی مشتریان و استثناهای کارمند (فقط مدیر ارشد).
+     */
+    public function updateCustomerAccess(Request $request, User $user): JsonResponse
+    {
+        $this->authorizePermission('users.manage');
+
+        $callingUser = auth()->user();
+
+        if (! $callingUser?->isAdministrator()) {
+            abort(403, 'تعریف دامنه دسترسی مشتریان فقط توسط مدیر ارشد سامانه امکان‌پذیر است.');
+        }
+
+        if ($user->email === 'admin@crm.local') {
+            return response()->json([
+                'message' => 'دامنه دسترسی حساب مدیر اصلی سیستم قابل تغییر نیست و همیشه «همه مشتریان» است.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'scope' => 'required|in:all,own,custom',
+            'staff_ids' => 'nullable|array',
+            'staff_ids.*' => 'integer|exists:users,id',
+            'customer_ids' => 'nullable|array',
+            'customer_ids.*' => 'integer|exists:customers,id',
+        ], [
+            'scope.required' => 'دامنه دسترسی را انتخاب کنید.',
+            'scope.in' => 'دامنه دسترسی انتخاب‌شده معتبر نیست.',
+        ]);
+
+        $scope = $validated['scope'];
+        $staffIds = array_values(array_unique(array_map('intval', $validated['staff_ids'] ?? [])));
+        $customerIds = array_values(array_unique(array_map('intval', $validated['customer_ids'] ?? [])));
+
+        // خود کارمند و مدیران ارشد نباید به عنوان «مشتریان یک کارمند دیگر» انتخاب شوند.
+        $staffIds = array_values(array_filter($staffIds, fn ($id) => $id !== (int) $user->id));
+
+        DB::transaction(function () use ($user, $scope, $staffIds, $customerIds, $callingUser) {
+            CustomerAccessGrant::where('user_id', $user->id)->delete();
+
+            $user->data_scope = $scope;
+            $user->save();
+
+            if ($scope !== 'custom') {
+                return;
+            }
+
+            foreach ($staffIds as $staffId) {
+                CustomerAccessGrant::create([
+                    'user_id' => $user->id,
+                    'scope_type' => CustomerAccessGrant::SCOPE_STAFF,
+                    'target_user_id' => $staffId,
+                    'created_by' => $callingUser?->id,
+                ]);
+            }
+
+            foreach ($customerIds as $customerId) {
+                CustomerAccessGrant::create([
+                    'user_id' => $user->id,
+                    'scope_type' => CustomerAccessGrant::SCOPE_CUSTOMER,
+                    'customer_id' => $customerId,
+                    'created_by' => $callingUser?->id,
+                ]);
+            }
+        });
+
+        return response()->json([
+            'message' => 'دامنه دسترسی مشتریان با موفقیت ذخیره شد.',
+            'access' => [
+                'scope' => $scope,
+                'staff_ids' => $staffIds,
+                'customer_ids' => $customerIds,
+            ],
         ]);
     }
 

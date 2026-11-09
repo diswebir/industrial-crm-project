@@ -3,15 +3,21 @@
 namespace App\Imports;
 
 use App\Models\Customer;
+use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
-use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
-use Illuminate\Support\Facades\Log;
 
 class CustomersImport implements ToModel, WithHeadingRow, SkipsEmptyRows
 {
     private int $importedCount = 0;
     private array $errors = [];
+    private ?int $creatorUserId = null;
+
+    /** ثبت‌کننده مشتریان واردشده (مالکیت پرونده برای RBAC). */
+    public function setCreatorUserId(?int $userId): void
+    {
+        $this->creatorUserId = $userId;
+    }
 
     public function model(array $row)
     {
@@ -30,12 +36,24 @@ class CustomersImport implements ToModel, WithHeadingRow, SkipsEmptyRows
         $address         = $this->getValue($row, ['adrs', 'address']);
         $notes           = $this->getValue($row, ['yaddasht', 'notes', 'description']);
 
-        if (empty($firstName) || empty($lastName)) {
+        // Determine person type first (اعتبارسنجی نام به نوع شخصیت وابسته است)
+        $personType = 'individual';
+        if (str_contains($personTypeRaw, 'حقوقی') || strtolower($personTypeRaw) === 'company' || (! empty($companyName) && empty($firstName) && empty($lastName))) {
+            $personType = 'company';
+        }
+
+        if ($personType === 'company') {
+            if (empty($companyName)) {
+                $this->errors[] = "سطر مربوط به شخص حقوقی فاقد «نام شرکت» است (موبایل: {$mobile})";
+                return null;
+            }
+        } elseif (empty($firstName) && empty($lastName)) {
             $this->errors[] = "سطر فاقد نام یا نام‌خانوادگی نادیده گرفته شد (موبایل: {$mobile})";
             return null;
         }
 
-        if (empty($mobile) || !preg_match('/^09\d{9}$/', $mobile)) {
+        // شماره همراه اختیاری است (تسک ۵) اما اگر وارد شد باید معتبر باشد.
+        if ($mobile !== '' && ! preg_match('/^09\d{9}$/', $mobile)) {
             $this->errors[] = "شماره همراه «{$mobile}» نامعتبر است (نام: {$firstName} {$lastName})";
             return null;
         }
@@ -46,31 +64,50 @@ class CustomersImport implements ToModel, WithHeadingRow, SkipsEmptyRows
             $customerType = 'effective';
         }
 
-        // Determine person type
-        $personType = 'individual';
-        if (str_contains($personTypeRaw, 'حقوقی') || strtolower($personTypeRaw) === 'company' || !empty($companyName)) {
-            $personType = 'company';
+        // کلید تطبیق رکورد: موبایل → کد ملی/شناسه ملی → نام شرکت یا نام و نام خانوادگی
+        $matchKey = [];
+        if ($mobile !== '') {
+            $matchKey = ['mobile' => $mobile];
+        } elseif ($nationalCode !== '') {
+            $matchKey = ['national_code' => $nationalCode];
+        } elseif ($personType === 'company') {
+            $matchKey = ['company_name' => $companyName];
+        } else {
+            $matchKey = ['first_name' => $firstName, 'last_name' => $lastName];
         }
+
+        $existing = Customer::where($matchKey)->first();
 
         $this->importedCount++;
 
-        return Customer::updateOrCreate(
-            ['mobile' => $mobile],
-            [
-                'customer_type' => $customerType,
-                'type' => $personType,
-                'first_name' => $firstName,
-                'last_name' => $lastName,
-                'company_name' => $companyName ?: null,
-                'national_code' => $nationalCode ?: null,
-                'phone' => $phone ?: null,
-                'email' => filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : null,
-                'province' => $province ?: null,
-                'city' => $city ?: null,
-                'address' => $address ?: null,
-                'notes' => $notes ?: null,
-            ]
-        );
+        $attributes = [
+            'customer_type' => $customerType,
+            'type' => $personType,
+            'first_name' => $firstName ?: null,
+            'last_name' => $lastName ?: null,
+            'company_name' => $companyName ?: null,
+            'national_code' => $nationalCode ?: null,
+            'mobile' => $mobile ?: null,
+            'phone' => $phone ?: null,
+            'email' => filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : null,
+            'province' => $province ?: null,
+            'city' => $city ?: null,
+            'address' => $address ?: null,
+            'notes' => $notes ?: null,
+        ];
+
+        // مالکیت پرونده فقط برای رکورد جدید (یا رکورد بدون مالک) تنظیم می‌شود تا مالکیت موجود تغییر نکند.
+        if ($this->creatorUserId && (! $existing || $existing->created_by === null)) {
+            $attributes['created_by'] = $this->creatorUserId;
+        }
+
+        if ($existing) {
+            $existing->update($attributes);
+
+            return $existing;
+        }
+
+        return Customer::create($attributes);
     }
 
     public function getImportedCount(): int
@@ -106,10 +143,12 @@ class CustomersImport implements ToModel, WithHeadingRow, SkipsEmptyRows
         $num = str_replace($arabic, $latin, $num);
         $num = preg_replace('/[^\d]/', '', $num);
 
-        if (str_starts_with($num, '989')) {
+        if (str_starts_with($num, '00989')) {
+            $num = '0' . substr($num, 4);
+        } elseif (str_starts_with($num, '989')) {
             $num = '0' . substr($num, 2);
         }
 
-        return $num;
+        return (string) $num;
     }
 }

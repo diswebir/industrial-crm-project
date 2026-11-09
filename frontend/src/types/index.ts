@@ -15,8 +15,13 @@ export interface User {
   is_active?: boolean
   permissions: string[]
   created_at?: string
-  user_type?: 'administrator' | 'manager'
+  user_type?: UserType
+  user_type_label?: string
+  data_scope?: DataScope
 }
+
+export type UserType = 'administrator' | 'manager' | 'salesperson' | 'installer'
+export type DataScope = 'all' | 'own' | 'custom'
 
 export interface CompanySettings {
   company_name: string | null
@@ -31,12 +36,12 @@ export interface Customer {
   id: number | string
   customer_type: CustomerType // potential (بالقوه) | effective (بالفعل)
   type: CustomerPersonType    // individual (حقیقی) | company (حقوقی)
-  first_name: string
-  last_name: string
+  first_name: string | null
+  last_name: string | null
   full_name?: string
-  company_name?: string
-  national_code?: string
-  mobile: string
+  company_name?: string | null
+  national_code?: string | null
+  mobile: string | null
   phone?: string
   email?: string
   province?: string
@@ -46,6 +51,9 @@ export interface Customer {
   created_at?: string
   updated_at?: string
   customer_parts_count?: number
+  devices_quantity?: number
+  created_by?: number | string | null
+  creator?: Pick<User, 'id' | 'name' | 'user_type'>
   customer_parts?: CustomerPart[]
   histories?: CustomerHistory[]
   sms_logs?: SmsLog[]
@@ -72,8 +80,15 @@ export interface Part {
   periodic_service_months: number
   description?: string
   is_active: boolean
+  stock_quantity: number
+  min_stock_quantity?: number
+  allocated_quantity?: number
+  available_quantity?: number
+  is_low_stock?: boolean
   customer_parts_count?: number
+  customer_parts_sum_quantity?: number
   customer_parts?: CustomerPart[]
+  inventory_logs?: InventoryLog[]
   created_at?: string
 }
 
@@ -83,14 +98,62 @@ export interface CustomerPart {
   id: number | string
   customer_id: number | string
   part_id: number | string
-  serial_number: string
+  quantity: number
+  invoice_number?: string | null
+  invoice_amount?: number | string | null
+  serial_number?: string | null
   installation_date?: string
   warranty_expire_date?: string
   status: CustomerPartStatus
   notes?: string
+  assigned_by_user_id?: number | string | null
   part?: Part
+  assigned_by?: Pick<User, 'id' | 'name'>
+  customer?: Customer
   service_histories?: PartServiceHistory[]
+  inventory_logs?: InventoryLog[]
   created_at?: string
+}
+
+export type InventoryMovementType = 'in' | 'out' | 'return' | 'adjust'
+
+export interface InventoryLog {
+  id: number | string
+  part_id: number | string
+  user_id?: number | string | null
+  customer_id?: number | string | null
+  customer_part_id?: number | string | null
+  type: InventoryMovementType
+  type_label?: string
+  quantity: number
+  stock_after: number
+  note?: string | null
+  created_at: string
+  part?: Part
+  user?: Pick<User, 'id' | 'name' | 'user_type'>
+  customer?: Customer
+}
+
+export interface InventorySummary {
+  total_parts: number
+  total_stock: number
+  total_allocated: number
+  low_stock_parts: number
+  today_movements: number
+}
+
+export interface CustomerAccessGrant {
+  scope: DataScope
+  staff_ids: number[]
+  customer_ids: number[]
+}
+
+export interface StaffOption {
+  id: number
+  name: string
+  email: string
+  user_type: UserType
+  user_type_label: string
 }
 
 export interface PartServiceHistory {
@@ -149,6 +212,8 @@ export interface DashboardStats {
     potential_customers: number
     total_parts: number
     assigned_parts: number
+    assigned_devices?: number
+    total_stock?: number
     total_sms_sent: number
   }
   recent_activities: CustomerHistory[]

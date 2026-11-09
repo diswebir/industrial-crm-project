@@ -11,6 +11,7 @@ import { Field, PageSkeleton } from '../../components/ui/Field'
 import { FilePondAvatar } from '../../components/ui/FilePondAvatar'
 import { ConfirmDialog } from '../../components/ui/Modal'
 import { PasswordRulesTooltip } from '../../components/ui/PasswordRulesTooltip'
+import { CustomerAccessEditor } from '../../components/settings/CustomerAccessEditor'
 import AccessDenied from '../AccessDenied'
 import { usersApi } from '../../services/api'
 import { useAuthStore } from '../../store/useAuthStore'
@@ -52,7 +53,7 @@ const schema = z.object({
       }
     }),
   is_active: z.boolean(),
-  user_type: z.enum(['administrator', 'manager']).optional(),
+  user_type: z.enum(['administrator', 'manager', 'salesperson', 'installer']).optional(),
 })
 
 type EditUserFormValues = z.infer<typeof schema>
@@ -365,6 +366,54 @@ export default function EditUserPage() {
                 </div>
               </label>
 
+              {isAdministrator && (
+                <label
+                  className={cx(
+                    'flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition-all',
+                    watch('user_type') === 'salesperson'
+                      ? 'border-blue-500 bg-blue-50/50 text-blue-900 shadow-xs dark:bg-blue-950/20 dark:text-blue-300'
+                      : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/40',
+                    user.email === 'admin@crm.local' && 'opacity-70 cursor-not-allowed',
+                  )}
+                >
+                  <input
+                    type="radio"
+                    value="salesperson"
+                    disabled={user.email === 'admin@crm.local'}
+                    className="radio radio-info radio-sm"
+                    {...register('user_type')}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-xs text-base-content">کارمند فروش (Salesperson)</p>
+                    <p className="text-[11px] text-base-content/60">پیش‌فرض: فقط مشتریان ایجادشده توسط خودش</p>
+                  </div>
+                </label>
+              )}
+
+              {isAdministrator && (
+                <label
+                  className={cx(
+                    'flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition-all',
+                    watch('user_type') === 'installer'
+                      ? 'border-emerald-500 bg-emerald-50/50 text-emerald-900 shadow-xs dark:bg-emerald-950/20 dark:text-emerald-300'
+                      : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/40',
+                    user.email === 'admin@crm.local' && 'opacity-70 cursor-not-allowed',
+                  )}
+                >
+                  <input
+                    type="radio"
+                    value="installer"
+                    disabled={user.email === 'admin@crm.local'}
+                    className="radio radio-success radio-sm"
+                    {...register('user_type')}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-xs text-base-content">نصاب (Installer)</p>
+                    <p className="text-[11px] text-base-content/60">نصب و سرویس دستگاه‌ها، دامنه دید محدود</p>
+                  </div>
+                </label>
+              )}
+
               {(isAdministrator || user.user_type === 'administrator') && (
                 <label
                   className={cx(
@@ -479,6 +528,9 @@ export default function EditUserPage() {
             })}
           </div>
         </div>
+
+        {/* Customer access scope & exceptions (task 1) */}
+        <CustomerAccessEditor user={user} />
 
         {/* Action Buttons */}
         <div className="flex items-center justify-end gap-3">

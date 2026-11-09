@@ -54,8 +54,19 @@ class UserResource extends Resource
                     ->options([
                         'administrator' => 'مدیر ارشد (Administrator)',
                         'manager' => 'مدیر (Manager)',
+                        'salesperson' => 'کارمند فروش (Salesperson)',
+                        'installer' => 'نصاب (Installer)',
                     ])
                     ->default('manager')
+                    ->required(),
+                Forms\Components\Select::make('data_scope')
+                    ->label('دامنه دسترسی مشتریان')
+                    ->options([
+                        'all' => 'همه مشتریان سامانه',
+                        'own' => 'فقط مشتریان ثبت‌شده توسط خودم',
+                        'custom' => 'مشتریان خودم + استثناها (از پنل اصلی)',
+                    ])
+                    ->default('all')
                     ->required(),
                 Forms\Components\Toggle::make('is_active')
                     ->label('حساب کاربری فعال است')
@@ -87,12 +98,23 @@ class UserResource extends Resource
                     ->label('نوع کاربر')
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         'administrator' => 'مدیر ارشد',
+                        'salesperson' => 'کارمند فروش',
+                        'installer' => 'نصاب',
                         default => 'مدیر',
                     })
                     ->colors([
                         'warning' => 'administrator',
+                        'info' => 'salesperson',
+                        'success' => 'installer',
                         'secondary' => 'manager',
                     ]),
+                Tables\Columns\TextColumn::make('data_scope')
+                    ->label('دامنه مشتریان')
+                    ->formatStateUsing(fn (?string $state): string => match ($state) {
+                        'own' => 'فقط خودم',
+                        'custom' => 'خودم + استثناها',
+                        default => 'همه مشتریان',
+                    }),
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('فعال')
                     ->boolean(),

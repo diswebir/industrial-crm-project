@@ -27,7 +27,7 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
-            ->brandName('مدیریت قطعات صنعتی')
+            ->brandName('مدیریت دستگاه‌ها و مشتریان صنعتی')
             ->colors([
                 'primary' => Color::Amber,
             ])

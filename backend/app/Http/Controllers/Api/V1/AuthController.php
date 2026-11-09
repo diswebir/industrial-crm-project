@@ -121,6 +121,8 @@ class AuthController extends Controller
                 'avatar_url' => $user->avatar_url,
                 'permissions' => $permissions,
                 'user_type' => $user->user_type,
+                'user_type_label' => $user->userTypeLabel(),
+                'data_scope' => $user->data_scope ?? 'all',
             ],
             'token' => $token,
         ])->withCookie($cookie);
@@ -166,6 +168,8 @@ class AuthController extends Controller
                 'avatar_url' => $user->avatar_url,
                 'permissions' => $permissions,
                 'user_type' => $user->user_type,
+                'user_type_label' => $user->userTypeLabel(),
+                'data_scope' => $user->data_scope ?? 'all',
             ],
             'token' => $token,
         ])->withCookie($cookie);
@@ -189,6 +193,8 @@ class AuthController extends Controller
                 'avatar_url' => $user->avatar_url,
                 'permissions' => $permissions,
                 'user_type' => $user->user_type,
+                'user_type_label' => $user->userTypeLabel(),
+                'data_scope' => $user->data_scope ?? 'all',
             ],
         ]);
     }
@@ -251,6 +257,8 @@ class AuthController extends Controller
                 'avatar_url' => $user->avatar_url,
                 'permissions' => $permissions,
                 'user_type' => $user->user_type,
+                'user_type_label' => $user->userTypeLabel(),
+                'data_scope' => $user->data_scope ?? 'all',
             ],
         ]);
     }

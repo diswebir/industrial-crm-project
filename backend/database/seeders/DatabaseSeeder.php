@@ -42,24 +42,32 @@ class DatabaseSeeder extends Seeder
                 'code' => 'PUMP-HYD-500',
                 'periodic_service_months' => 6,
                 'description' => 'پمپ هیدرولیک دبی متغیر ۵۰۰ بار مناسب خطوط اکستروژن و پرس',
+                'stock_quantity' => 20,
+                'min_stock_quantity' => 3,
             ],
             [
                 'name' => 'شیر برقی پروپورشنال کنترل جهت و جریان',
                 'code' => 'VALVE-PROP-24V',
                 'periodic_service_months' => 12,
                 'description' => 'شیر هیدرولیکی سرو با فیدبک موقعیت LVDT ولتاژ ۲۴ ولت',
+                'stock_quantity' => 14,
+                'min_stock_quantity' => 2,
             ],
             [
                 'name' => 'سیلندر هیدرولیک دوطرفه صنعتی سنگین',
                 'code' => 'CYL-IND-160',
                 'periodic_service_months' => 12,
                 'description' => 'سیلندر کورس ۱۰۰۰ میلیمتر با پیستون کروم سخت',
+                'stock_quantity' => 9,
+                'min_stock_quantity' => 2,
             ],
             [
                 'name' => 'الکتروموتور سه‌فاز صنعتی ۱۵ کیلووات',
                 'code' => 'MOT-3PH-15KW',
                 'periodic_service_months' => 24,
                 'description' => 'الکتروموتور پوسته چدنی کلاس عایقی F با بیرینگ‌های تقویت‌شده',
+                'stock_quantity' => 7,
+                'min_stock_quantity' => 1,
             ],
         ];
 
@@ -86,6 +94,7 @@ class DatabaseSeeder extends Seeder
                 'city' => 'اصفهان',
                 'address' => 'شهرک صنعتی جی، خیابان چهارم، پلاک ۲۴',
                 'notes' => 'دارای ۴ خط تولید فعال - خرید عمده قطعات',
+                'created_by' => $admin->id,
             ]
         );
 
@@ -104,6 +113,7 @@ class DatabaseSeeder extends Seeder
                 'city' => 'نجف‌آباد',
                 'address' => 'بلوار صنعت، کوی کارآفرینان ۳',
                 'notes' => 'مشتری بالقوه در حال مذاکره برای خرید قطعات هیدرولیک',
+                'created_by' => $admin->id,
             ]
         );
 
@@ -121,6 +131,7 @@ class DatabaseSeeder extends Seeder
                 'city' => 'تهران',
                 'address' => 'خیابان جمهوری، پاساژ حافظ',
                 'notes' => 'پرسش درباره دوره گارانتی و سرویس دوره‌ای پمپ‌ها',
+                'created_by' => $admin->id,
             ]
         );
 
@@ -130,7 +141,12 @@ class DatabaseSeeder extends Seeder
                 $c1,
                 $parts['PUMP-HYD-500'],
                 'SN-2026-HYD-00189',
-                ['notes' => 'تحویل حضوری با برگه ضمانت ۶ ماهه'],
+                [
+                    'notes' => 'تحویل حضوری با برگه ضمانت ۶ ماهه',
+                    'quantity' => 1,
+                    'invoice_number' => 'INV-1404-0001',
+                    'invoice_amount' => 48500000,
+                ],
                 $admin->id
             );
 

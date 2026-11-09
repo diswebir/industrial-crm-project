@@ -14,6 +14,29 @@ class User extends Authenticatable implements FilamentUser
 {
     use HasApiTokens, HasFactory, Notifiable, HasRoles;
 
+    /**
+     * نقش‌های سیستمی مجاز (Pure ACL: نقش فقط برچسب سازمانی است و دسترسی از مجوزهای مستقیم می‌آید).
+     */
+    public const USER_TYPES = [
+        'administrator',
+        'manager',
+        'salesperson',
+        'installer',
+    ];
+
+    public const DATA_SCOPES = [
+        'all',    // همه مشتریان سامانه
+        'own',    // فقط مشتریان ثبت‌شده توسط خود کاربر
+        'custom', // مشتریان خودم + استثناهای تعریف‌شده در customer_access_grants
+    ];
+
+    public const USER_TYPE_LABELS = [
+        'administrator' => 'مدیر ارشد',
+        'manager' => 'مدیر',
+        'salesperson' => 'کارمند فروش',
+        'installer' => 'نصاب',
+    ];
+
     public function canAccessPanel(Panel $panel): bool
     {
         return (bool) ($this->is_active && $this->isAdministrator() && ($this->email === 'admin@crm.local' || $this->can('users.manage')));
@@ -25,6 +48,30 @@ class User extends Authenticatable implements FilamentUser
     public function isAdministrator(): bool
     {
         return $this->user_type === 'administrator';
+    }
+
+    public function isSalesperson(): bool
+    {
+        return $this->user_type === 'salesperson';
+    }
+
+    public function isInstaller(): bool
+    {
+        return $this->user_type === 'installer';
+    }
+
+    /**
+     * آیا این کاربر به همه مشتریان سامانه دسترسی دارد؟
+     * کاربران قبلی سامانه به صورت پیش‌فرض data_scope=all دارند تا دسترسی‌شان تغییر نکند.
+     */
+    public function hasFullCustomerAccess(): bool
+    {
+        return $this->isAdministrator() || ($this->data_scope ?? 'all') === 'all';
+    }
+
+    public function userTypeLabel(): string
+    {
+        return self::USER_TYPE_LABELS[$this->user_type] ?? (string) $this->user_type;
     }
 
     /**
@@ -40,6 +87,7 @@ class User extends Authenticatable implements FilamentUser
         'password',
         'is_active',
         'user_type',
+        'data_scope',
     ];
 
     protected $appends = [
@@ -81,6 +129,7 @@ class User extends Authenticatable implements FilamentUser
             'password' => 'hashed',
             'is_active' => 'boolean',
             'user_type' => 'string',
+            'data_scope' => 'string',
         ];
     }
 }

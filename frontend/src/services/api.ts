@@ -12,6 +12,13 @@ import type {
   ResourceName,
   Resources,
   CompanySettings,
+  InventoryLog,
+  InventorySummary,
+  InventoryMovementType,
+  CustomerAccessGrant,
+  StaffOption,
+  DataScope,
+  UserType,
 } from '../types'
 
 export const http = axios.create({
@@ -82,7 +89,7 @@ export const dashboardApi = {
 }
 
 export const customerApi = {
-  list: async (params?: { customer_type?: string; q?: string; page?: number; per_page?: number }) => {
+  list: async (params?: { customer_type?: string; q?: string; page?: number; per_page?: number; created_by?: number | string }) => {
     const { data } = await http.get<{ data: Customer[]; current_page: number; last_page: number; total: number }>('/customers', { params })
     return data
   },
@@ -127,16 +134,26 @@ export const customerApi = {
     a.remove()
     window.URL.revokeObjectURL(downloadUrl)
   },
-  downloadExport: async (customerType?: string) => {
-    const url = customerType ? `/customers/export?customer_type=${customerType}` : '/customers/export'
+  /**
+   * خروجی جامع مشتریان همراه با دستگاه‌ها و فاکتورها.
+   * format = xlsx (پیش‌فرض) یا csv (با UTF-8 BOM برای باز شدن صحیح فارسی در Excel)
+   */
+  downloadExport: async (customerType?: string, format: 'xlsx' | 'csv' = 'xlsx') => {
+    const params = new URLSearchParams()
+    if (customerType) params.set('customer_type', customerType)
+    if (format === 'csv') params.set('format', 'csv')
+    const query = params.toString()
+    const url = query ? `/customers/export?${query}` : '/customers/export'
     const response = await http.get(url, { responseType: 'blob' })
-    const blob = new Blob([response.data], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    })
+    const mime =
+      format === 'csv'
+        ? 'text/csv;charset=utf-8'
+        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    const blob = new Blob([response.data], { type: mime })
     const downloadUrl = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = downloadUrl
-    a.download = `customers-${new Date().toISOString().slice(0, 10)}.xlsx`
+    a.download = `customers-${new Date().toISOString().slice(0, 10)}.${format}`
     document.body.appendChild(a)
     a.click()
     a.remove()
@@ -161,12 +178,104 @@ export const partApi = {
     const { data } = await http.delete<{ message: string }>(`/parts/${id}`)
     return data
   },
-  assignPart: async (customerId: number | string, body: { part_id: number | string; serial_number: string; installation_date?: string; notes?: string }) => {
-    const { data } = await http.post<{ message: string; customer_part: CustomerPart; customer_type: string }>(`/customers/${customerId}/parts`, body)
+  assignPart: async (
+    customerId: number | string,
+    body: {
+      part_id: number | string
+      quantity: number
+      serial_number?: string | null
+      invoice_number?: string | null
+      invoice_amount?: number | string | null
+      installation_date?: string
+      warranty_expire_date?: string
+      status?: string
+      notes?: string
+    },
+  ) => {
+    const { data } = await http.post<{
+      message: string
+      customer_part: CustomerPart
+      customer_type: string
+      stock_quantity: number
+    }>(`/customers/${customerId}/parts`, body)
+    return data
+  },
+  updateAssignment: async (
+    customerPartId: number | string,
+    body: {
+      part_id?: number | string
+      quantity?: number
+      serial_number?: string | null
+      invoice_number?: string | null
+      invoice_amount?: number | string | null
+      installation_date?: string
+      warranty_expire_date?: string
+      status?: string
+      notes?: string
+    },
+  ) => {
+    const { data } = await http.put<{ message: string; customer_part: CustomerPart }>(
+      `/customer-parts/${customerPartId}`,
+      body,
+    )
+    return data
+  },
+  deleteAssignment: async (customerPartId: number | string) => {
+    const { data } = await http.delete<{ message: string }>(`/customer-parts/${customerPartId}`)
     return data
   },
   addServiceHistory: async (customerPartId: number | string, body: { service_date: string; service_type: string; description: string; cost?: number }) => {
     const { data } = await http.post<{ message: string; history: PartServiceHistory }>(`/customer-parts/${customerPartId}/history`, body)
+    return data
+  },
+  deleteServiceHistory: async (customerPartId: number | string, historyId: number | string) => {
+    const { data } = await http.delete<{ message: string }>(
+      `/customer-parts/${customerPartId}/history/${historyId}`,
+    )
+    return data
+  },
+}
+
+export const inventoryApi = {
+  summary: async () => {
+    const { data } = await http.get<InventorySummary>('/inventory/summary')
+    return data
+  },
+  logs: async (params?: {
+    part_id?: number | string
+    type?: InventoryMovementType | ''
+    customer_id?: number | string
+    user_id?: number | string
+    q?: string
+    from?: string
+    to?: string
+    page?: number
+    per_page?: number
+  }) => {
+    const { data } = await http.get<{ data: InventoryLog[]; current_page: number; last_page: number; total: number }>(
+      '/inventory/logs',
+      { params },
+    )
+    return data
+  },
+  parts: async () => {
+    const { data } = await http.get<Part[]>('/inventory/parts')
+    return data
+  },
+  customers: async () => {
+    const { data } = await http.get<Customer[]>('/inventory/customers')
+    return data
+  },
+  createMovement: async (body: {
+    part_id: number | string
+    type: 'in' | 'out' | 'adjust'
+    quantity: number
+    note?: string
+  }) => {
+    const { data } = await http.post<{ message: string; log: InventoryLog; stock_quantity: number }>(
+      '/inventory/movements',
+      body,
+    )
     return data
   },
 }
@@ -211,11 +320,38 @@ export const usersApi = {
     data.id = String(data.id)
     return data as User
   },
-  create: async (body: FormData | { name: string; email: string; phone?: string; password: string; permissions?: string[] }) => {
+  create: async (
+    body:
+      | FormData
+      | {
+          name: string
+          email: string
+          phone?: string
+          password: string
+          permissions?: string[]
+          user_type?: UserType
+          data_scope?: DataScope
+          is_active?: boolean
+        },
+  ) => {
     const { data } = await http.post<{ message: string; user: User }>('/users', body)
     return data
   },
-  update: async (id: number | string, body: FormData | { name: string; email: string; phone?: string; password?: string; permissions?: string[]; is_active?: boolean }) => {
+  update: async (
+    id: number | string,
+    body:
+      | FormData
+      | {
+          name: string
+          email: string
+          phone?: string
+          password?: string
+          permissions?: string[]
+          is_active?: boolean
+          user_type?: UserType
+          data_scope?: DataScope
+        },
+  ) => {
     const { data } = await http.post<{ message: string; user: User }>(`/users/${id}`, body)
     return data
   },
@@ -233,6 +369,24 @@ export const usersApi = {
   },
   getAvailablePermissions: async () => {
     const { data } = await http.get<SystemPermission[]>('/permissions')
+    return data
+  },
+  staffOptions: async () => {
+    const { data } = await http.get<StaffOption[]>('/users/staff-options')
+    return data
+  },
+  getCustomerAccess: async (userId: number | string) => {
+    const { data } = await http.get<CustomerAccessGrant>(`/users/${userId}/customer-access`)
+    return data
+  },
+  updateCustomerAccess: async (
+    userId: number | string,
+    body: { scope: DataScope; staff_ids?: number[]; customer_ids?: number[] },
+  ) => {
+    const { data } = await http.put<{ message: string; access: CustomerAccessGrant }>(
+      `/users/${userId}/customer-access`,
+      body,
+    )
     return data
   },
 }

@@ -5,14 +5,17 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\SmsLog;
+use App\Services\Customers\CustomerAccessService;
 use App\Services\Sms\MelipayamakService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class SmsController extends Controller
 {
-    public function __construct(protected MelipayamakService $melipayamakService)
-    {
+    public function __construct(
+        protected MelipayamakService $melipayamakService,
+        protected CustomerAccessService $access
+    ) {
     }
 
     /**
@@ -32,6 +35,11 @@ class SmsController extends Controller
         $customer = isset($validated['customer_id'])
             ? Customer::find($validated['customer_id'])
             : null;
+
+        // جلوگیری از ارسال پیامک به مشتری خارج از دامنه دسترسی کاربر (تسک ۱).
+        if ($customer) {
+            $this->access->authorizeView($request->user(), $customer);
+        }
 
         $result = $this->melipayamakService->sendPattern(
             $validated['mobile'],
@@ -56,6 +64,12 @@ class SmsController extends Controller
         $this->authorizePermission('sms.logs');
 
         $query = SmsLog::with('customer')->latest();
+
+        // لاگ پیامک هم باید دامنه دسترسی کاربر را رعایت کند تا نام/شماره مشتریان
+        // خارج از دسترسی افشا نشود.
+        if (! $this->access->hasFullAccess($request->user())) {
+            $query->whereIn('customer_id', $this->access->visibleCustomerIds($request->user()));
+        }
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);

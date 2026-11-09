@@ -47,21 +47,21 @@ class CustomerResource extends Resource
                     ->required(),
                 Forms\Components\TextInput::make('first_name')
                     ->label('نام')
-                    ->required()
+                    ->required(fn (Forms\Get $get): bool => $get('type') === 'individual')
                     ->maxLength(255),
                 Forms\Components\TextInput::make('last_name')
                     ->label('نام خانوادگی')
-                    ->required()
+                    ->required(fn (Forms\Get $get): bool => $get('type') === 'individual')
                     ->maxLength(255),
                 Forms\Components\TextInput::make('company_name')
                     ->label('نام شرکت / سازمان')
+                    ->required(fn (Forms\Get $get): bool => $get('type') === 'company')
                     ->maxLength(255),
                 Forms\Components\TextInput::make('national_code')
                     ->label('کد ملی / شناسه ملی')
                     ->maxLength(20),
                 Forms\Components\TextInput::make('mobile')
-                    ->label('شماره همراه')
-                    ->required()
+                    ->label('شماره همراه (اختیاری)')
                     ->maxLength(20),
                 Forms\Components\TextInput::make('phone')
                     ->label('تلفن ثابت')

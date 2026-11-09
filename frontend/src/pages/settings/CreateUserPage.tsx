@@ -36,7 +36,8 @@ const schema = z.object({
     .min(8, 'کلمه عبور باید حداقل ۸ کاراکتر باشد')
     .regex(/^(?=.*[a-zA-Z])(?=.*\d)/, 'کلمه عبور باید شامل حروف انگلیسی و اعداد باشد'),
   is_active: z.boolean(),
-  user_type: z.enum(['administrator', 'manager']),
+  user_type: z.enum(['administrator', 'manager', 'salesperson', 'installer']),
+  data_scope: z.enum(['all', 'own']),
 })
 
 type CreateUserFormValues = z.infer<typeof schema>
@@ -71,6 +72,7 @@ export default function CreateUserPage() {
       password: '',
       is_active: true,
       user_type: 'manager',
+      data_scope: 'all',
     },
   })
 
@@ -111,6 +113,7 @@ export default function CreateUserPage() {
     formData.append('password', values.password)
     formData.append('is_active', values.is_active ? '1' : '0')
     formData.append('user_type', values.user_type)
+    formData.append('data_scope', values.data_scope)
 
     if (avatarFile) {
       formData.append('avatar', avatarFile)
@@ -223,7 +226,7 @@ export default function CreateUserPage() {
               <p className="font-bold text-xs text-base-content">نوع کاربری (نقش سیستمی)</p>
               <p className="text-[11px] text-base-content/60 mt-0.5">
                 {isAdministrator
-                  ? 'تعیین سطح کاربری: مدیر ارشد یا مدیر عادی سامانه'
+                  ? 'تعیین سطح کاربری: مدیر ارشد، مدیر، کارمند فروش یا نصاب. دامنه دید مشتریان در پایین قابل تنظیم است.'
                   : 'کاربران ایجاد شده توسط شما با سطح دسترسی «مدیر» تعریف می‌شوند.'}
               </p>
             </div>
@@ -253,6 +256,50 @@ export default function CreateUserPage() {
                 <label
                   className={cx(
                     'flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition-all',
+                    watch('user_type') === 'salesperson'
+                      ? 'border-blue-500 bg-blue-50/50 text-blue-900 shadow-xs dark:bg-blue-950/20 dark:text-blue-300'
+                      : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/40',
+                  )}
+                >
+                  <input
+                    type="radio"
+                    value="salesperson"
+                    className="radio radio-info radio-sm"
+                    {...register('user_type')}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-xs text-base-content">کارمند فروش (Salesperson)</p>
+                    <p className="text-[11px] text-base-content/60">پیش‌فرض: فقط مشتریان ایجادشده توسط خودش</p>
+                  </div>
+                </label>
+              )}
+
+              {isAdministrator && (
+                <label
+                  className={cx(
+                    'flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition-all',
+                    watch('user_type') === 'installer'
+                      ? 'border-emerald-500 bg-emerald-50/50 text-emerald-900 shadow-xs dark:bg-emerald-950/20 dark:text-emerald-300'
+                      : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/40',
+                  )}
+                >
+                  <input
+                    type="radio"
+                    value="installer"
+                    className="radio radio-success radio-sm"
+                    {...register('user_type')}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-xs text-base-content">نصاب (Installer)</p>
+                    <p className="text-[11px] text-base-content/60">نصب و سرویس دستگاه‌ها، دامنه دید محدود</p>
+                  </div>
+                </label>
+              )}
+
+              {isAdministrator && (
+                <label
+                  className={cx(
+                    'flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition-all',
                     watch('user_type') === 'administrator'
                       ? 'border-amber-500 bg-amber-50/50 text-amber-900 shadow-xs dark:bg-amber-950/20 dark:text-amber-300'
                       : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/40',
@@ -270,6 +317,59 @@ export default function CreateUserPage() {
                   </div>
                 </label>
               )}
+            </div>
+          </div>
+
+          {/* Data scope (RBAC – customer visibility) */}
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+            <div>
+              <p className="font-bold text-xs text-base-content">دامنه دسترسی به مشتریان</p>
+              <p className="text-[11px] text-base-content/60 mt-0.5">
+                این تنظیم تعیین می‌کند کاربر کدام پرونده‌های مشتری را ببیند و ویرایش کند. اعطای استثنا برای مشتریان
+                مشخص یا کارشناسان دیگر، پس از ایجاد کاربر از صفحه «ویرایش کاربر» امکان‌پذیر است.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+              <label
+                className={cx(
+                  'flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-all',
+                  watch('data_scope') === 'all'
+                    ? 'border-primary bg-primary/5 shadow-xs'
+                    : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/40',
+                )}
+              >
+                <input
+                  type="radio"
+                  value="all"
+                  className="radio radio-primary radio-sm mt-0.5"
+                  {...register('data_scope')}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-xs text-base-content">دسترسی به تمام مشتریان</p>
+                  <p className="text-[11px] text-base-content/60">کاربر همه پرونده‌های سازمان را می‌بیند.</p>
+                </div>
+              </label>
+
+              <label
+                className={cx(
+                  'flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-all',
+                  watch('data_scope') === 'own'
+                    ? 'border-primary bg-primary/5 shadow-xs'
+                    : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/40',
+                )}
+              >
+                <input
+                  type="radio"
+                  value="own"
+                  className="radio radio-primary radio-sm mt-0.5"
+                  {...register('data_scope')}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-xs text-base-content">فقط مشتریان خودم</p>
+                  <p className="text-[11px] text-base-content/60">مشتریانی که این کاربر ثبت کرده است.</p>
+                </div>
+              </label>
             </div>
           </div>
 

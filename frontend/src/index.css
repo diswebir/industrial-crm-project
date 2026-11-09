@@ -1,5 +1,75 @@
 @import "tailwindcss";
 
+/* ══════════════════════════════════════════════════════════════════════════
+   فونت وزیرمتن نسخه FD (Farsi Digits) — تسک ۹
+   در این نسخه از فونت، گلیف ارقام لاتین با ارقام فارسی «۰۱۲۳۴۵۶۷۸۹» جایگزین شده
+   است؛ بنابراین همه اعداد (جداول، قیمت‌ها، تاریخ‌ها، شماره‌ها، اینپوت‌ها و
+   صفحه‌بندی) بدون هیچ تغییر در مقدار واقعی داده، فارسی نمایش داده می‌شوند.
+   ══════════════════════════════════════════════════════════════════════════ */
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('/fonts/Vazirmatn-FD-Thin.woff2') format('woff2');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('/fonts/Vazirmatn-FD-ExtraLight.woff2') format('woff2');
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('/fonts/Vazirmatn-FD-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('/fonts/Vazirmatn-FD-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('/fonts/Vazirmatn-FD-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('/fonts/Vazirmatn-FD-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('/fonts/Vazirmatn-FD-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('/fonts/Vazirmatn-FD-ExtraBold.woff2') format('woff2');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('/fonts/Vazirmatn-FD-Black.woff2') format('woff2');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Bind Tailwind's dark: variant to data-theme="nikan-dark" and .dark class instead of OS media query */
 @custom-variant dark (&:where([data-theme="nikan-dark"], [data-theme="nikan-dark"] *, .dark, .dark *));
 
@@ -78,7 +148,8 @@
 }
 
 @theme {
-  --font-sans: "Vazirmatn Variable", "Vazirmatn", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Vazirmatn FD", "Vazirmatn Variable", "Vazirmatn", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Vazirmatn FD", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 @layer base {
@@ -86,6 +157,36 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     scroll-behavior: smooth;
+  }
+
+  /* یکدست‌سازی فونت روی همه کنترل‌های فرم و جداول (تسک ۹) */
+  body,
+  input,
+  button,
+  select,
+  textarea,
+  table,
+  optgroup,
+  option,
+  kbd,
+  code,
+  pre,
+  .btn,
+  .input,
+  .select,
+  .textarea,
+  .tab,
+  .badge,
+  .label,
+  .fieldset-legend {
+    font-family: var(--font-sans);
+  }
+
+  /* ارقام فارسی از خود فونت می‌آید؛ ویژگی‌های عددی جایگزین غیرفعال می‌شود */
+  html,
+  body {
+    font-feature-settings: "ss01" 0;
+    font-variant-numeric: normal;
   }
   body {
     background-color: var(--color-base-200);

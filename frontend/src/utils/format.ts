@@ -102,8 +102,17 @@ export function relativeFa(iso: string | Date | null | undefined, now = Date.now
   return `${num(Math.floor(mo / 12))} سال ${suffix}`
 }
 
-export const fullName = (c: { firstName?: string; lastName?: string; first_name?: string; last_name?: string }) =>
-  c.first_name ? `${c.first_name} ${c.last_name || ''}`.trim() : `${c.firstName || ''} ${c.lastName || ''}`.trim()
+export const fullName = (c: {
+  firstName?: string | null
+  lastName?: string | null
+  first_name?: string | null
+  last_name?: string | null
+  company_name?: string | null
+}) => {
+  const person = `${c.first_name ?? c.firstName ?? ''} ${c.last_name ?? c.lastName ?? ''}`.trim()
+  // برای مشتری حقوقی که نام شخص ندارد، نام شرکت نمایش داده می‌شود.
+  return person || (c.company_name ?? '').trim()
+}
 
 /** Stable pseudo-random hue from a string, used for avatar colours. */
 export function hueFrom(str: string): number {

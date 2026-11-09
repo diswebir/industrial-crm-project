@@ -3,15 +3,12 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\PartResource\Pages;
-use App\Filament\Resources\PartResource\RelationManagers;
 use App\Models\Part;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class PartResource extends Resource
 {
@@ -19,22 +16,22 @@ class PartResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-cog-6-tooth';
 
-    protected static ?string $navigationLabel = 'قطعات';
+    protected static ?string $navigationLabel = 'دستگاه‌ها';
 
-    protected static ?string $modelLabel = 'قطعه';
+    protected static ?string $modelLabel = 'دستگاه';
 
-    protected static ?string $pluralModelLabel = 'قطعات';
+    protected static ?string $pluralModelLabel = 'دستگاه‌ها';
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
                 Forms\Components\TextInput::make('name')
-                    ->label('نام قطعه')
+                    ->label('نام دستگاه')
                     ->required()
                     ->maxLength(255),
                 Forms\Components\TextInput::make('code')
-                    ->label('کد فنی قطعه')
+                    ->label('کد فنی دستگاه')
                     ->required()
                     ->maxLength(255),
                 Forms\Components\TextInput::make('periodic_service_months')
@@ -42,6 +39,19 @@ class PartResource extends Resource
                     ->required()
                     ->numeric()
                     ->default(12),
+                // موجودی فقط از طریق ماژول انبار (با ثبت لاگ و کاربر) تغییر می‌کند؛
+                // ویرایش مستقیم در پنل مدیریت، ردیابی انبار را نقض می‌کند.
+                Forms\Components\TextInput::make('stock_quantity')
+                    ->label('موجودی انبار (عدد)')
+                    ->helperText('فقط خواندنی — برای ورود/خروج یا اصلاح موجودی از صفحه «انبار و تاریخچه ورود/خروج» در سامانه استفاده کنید.')
+                    ->numeric()
+                    ->disabled()
+                    ->dehydrated(false)
+                    ->default(0),
+                Forms\Components\TextInput::make('min_stock_quantity')
+                    ->label('حد هشدار موجودی')
+                    ->numeric()
+                    ->default(0),
                 Forms\Components\Toggle::make('is_active')
                     ->label('فعال در کاتالوگ')
                     ->default(true)
@@ -58,11 +68,20 @@ class PartResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('id')->label('شناسه')->sortable(),
                 Tables\Columns\TextColumn::make('name')
-                    ->label('نام قطعه')
+                    ->label('نام دستگاه')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('code')
                     ->label('کد فنی')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('stock_quantity')
+                    ->label('موجودی انبار')
+                    ->numeric()
+                    ->sortable()
+                    ->badge()
+                    ->color(fn ($state, Part $record): string => $record->is_low_stock ? 'danger' : 'success'),
+                Tables\Columns\TextColumn::make('allocated_quantity')
+                    ->label('تخصیص‌یافته')
+                    ->numeric(),
                 Tables\Columns\TextColumn::make('periodic_service_months')
                     ->label('دوره سرویس (ماه)')
                     ->numeric()
@@ -75,6 +94,7 @@ class PartResource extends Resource
                     ->dateTime()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('updated_at')
+                    ->label('آخرین بروزرسانی')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),

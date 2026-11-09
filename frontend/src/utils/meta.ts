@@ -66,6 +66,7 @@ export const activityType: Record<ActivityType, { label: string }> = {
 export const roleLabel: Record<string, string> = {
   admin: 'مدیر سیستم', manager: 'سرپرست', sales: 'فروش', support: 'پشتیبانی',
   warehouse: 'انبار', finance: 'مالی', marketing: 'بازاریابی',
+  administrator: 'مدیر ارشد', salesperson: 'کارمند فروش', installer: 'نصاب',
 }
 
 export const PAYMENT_METHODS = ['کارت به کارت', 'پوز فروشگاهی', 'چک', 'نقدی', 'پرداخت اینترنتی']

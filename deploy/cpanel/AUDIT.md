@@ -33,7 +33,7 @@
 | ۱۰ تست رگرسیون بسته‌بندی با dependency doubles | موفق محلی و CI |
 | ساخت هر دو ZIP، unzip integrity، layout و sensitive-file checks | موفق در CI |
 | استخراج بسته در دو مسیر مستقل و bootstrap واقعی Laravel | موفق در CI |
-| migrate دوبار، مدیر، ۱۴ مجوز و مسیر آپلود با SQLite | موفق در CI |
+| migrate دوبار، مدیر، ۱۸ مجوز و مسیر آپلود با SQLite | موفق در CI |
 | همان تست‌ها با MySQL 8 | موفق در CI |
 | bash syntax و git diff --check | موفق محلی |
 

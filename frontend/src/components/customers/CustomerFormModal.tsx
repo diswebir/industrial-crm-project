@@ -8,51 +8,92 @@ import { Field } from '../ui/Field'
 import { SearchableSelect } from '../ui/SearchableSelect'
 import { customerApi } from '../../services/api'
 import { IRAN_PROVINCES, getCitiesByProvince } from '../../data/iranLocations'
-import { cx } from '../../utils/format'
+import { cx, toEnDigits } from '../../utils/format'
 import type { Customer } from '../../types'
 
+/**
+ * اعتبارسنجی فرم مشتری (تسک ۵):
+ *  - شخص حقوقی: «نام شرکت» اجباری است و نام/نام‌خانوادگی اختیاری.
+ *  - شخص حقیقی: نام و نام‌خانوادگی اجباری است.
+ *  - شماره همراه در هر دو حالت اختیاری است (اگر وارد شود باید معتبر باشد).
+ */
 const schema = z
   .object({
     customer_type: z.enum(['potential', 'effective']),
     type: z.enum(['individual', 'company']),
-    first_name: z.string().trim().min(2, 'نام باید حداقل ۲ کاراکتر باشد'),
-    last_name: z.string().trim().min(2, 'نام خانوادگی باید حداقل ۲ کاراکتر باشد'),
+    first_name: z.string().trim().optional(),
+    last_name: z.string().trim().optional(),
     company_name: z.string().trim().optional(),
     national_code: z.string().trim().optional(),
-    mobile: z
-      .string()
-      .trim()
-      .regex(/^09\d{9}$/, 'شماره همراه باید ۱۱ رقم عددی بوده و با 09 شروع شود (مثال: 09121234567)'),
+    mobile: z.string().trim().optional(),
     phone: z
       .string()
       .trim()
       .regex(/^0\d{10}$/, 'شماره تلفن ثابت باید ۱۱ رقم عددی بوده و با 0 شروع شود (مثال: 02188776655)')
       .or(z.literal(''))
       .optional(),
-    email: z.string().email('فرمت آدرس ایمیل معتبر نیست').or(z.literal('')).optional(),
+    email: z.string().trim().email('فرمت آدرس ایمیل معتبر نیست').or(z.literal('')).optional(),
     province: z.string().trim().optional(),
     city: z.string().trim().optional(),
     address: z.string().trim().optional(),
     notes: z.string().trim().optional(),
   })
   .superRefine((data, ctx) => {
+    if (data.type === 'company') {
+      if (!data.company_name || data.company_name.length < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['company_name'],
+          message: 'نام شرکت / کارگاه باید حداقل ۲ کاراکتر باشد',
+        })
+      }
+    } else {
+      if (!data.first_name || data.first_name.length < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['first_name'],
+          message: 'نام باید حداقل ۲ کاراکتر باشد',
+        })
+      }
+      if (!data.last_name || data.last_name.length < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['last_name'],
+          message: 'نام خانوادگی باید حداقل ۲ کاراکتر باشد',
+        })
+      }
+      if (data.company_name && data.company_name.length > 0 && data.company_name.length < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['company_name'],
+          message: 'نام شرکت باید حداقل ۲ کاراکتر باشد',
+        })
+      }
+    }
+
+    if (data.mobile && data.mobile.length > 0 && !/^09\d{9}$/.test(data.mobile)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['mobile'],
+        message: 'شماره همراه باید ۱۱ رقم عددی بوده و با 09 شروع شود (مثال: 09121234567)',
+      })
+    }
+
     if (data.national_code && data.national_code.length > 0) {
-      if (data.type === 'individual') {
-        if (!/^\d{10}$/.test(data.national_code)) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ['national_code'],
-            message: 'کد ملی برای شخص حقیقی باید دقیقاً ۱۰ رقم عددی باشد',
-          })
-        }
-      } else if (data.type === 'company') {
-        if (!/^\d{11}$/.test(data.national_code)) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ['national_code'],
-            message: 'شناسه ملی برای شخص حقوقی باید دقیقاً ۱۱ رقم عددی باشد',
-          })
-        }
+      if (data.type === 'individual' && !/^\d{10}$/.test(data.national_code)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['national_code'],
+          message: 'کد ملی برای شخص حقیقی باید دقیقاً ۱۰ رقم عددی باشد',
+        })
+      }
+
+      if (data.type === 'company' && !/^\d{11}$/.test(data.national_code)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['national_code'],
+          message: 'شناسه ملی برای شخص حقوقی باید دقیقاً ۱۱ رقم عددی باشد',
+        })
       }
     }
   })
@@ -66,6 +107,22 @@ interface CustomerFormModalProps {
   onSuccess: () => void
 }
 
+const EMPTY_VALUES: FormValues = {
+  customer_type: 'potential',
+  type: 'individual',
+  first_name: '',
+  last_name: '',
+  company_name: '',
+  national_code: '',
+  mobile: '',
+  phone: '',
+  email: '',
+  province: 'تهران',
+  city: 'تهران',
+  address: '',
+  notes: '',
+}
+
 export function CustomerFormModal({ open, onClose, customer, onSuccess }: CustomerFormModalProps) {
   const {
     register,
@@ -76,59 +133,32 @@ export function CustomerFormModal({ open, onClose, customer, onSuccess }: Custom
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      customer_type: 'potential',
-      type: 'individual',
-      first_name: '',
-      last_name: '',
-      company_name: '',
-      national_code: '',
-      mobile: '',
-      phone: '',
-      email: '',
-      province: 'تهران',
-      city: 'تهران',
-      address: '',
-      notes: '',
-    },
+    defaultValues: EMPTY_VALUES,
   })
 
   useEffect(() => {
-    if (open) {
-      if (customer) {
-        reset({
-          customer_type: customer.customer_type,
-          type: customer.type,
-          first_name: customer.first_name,
-          last_name: customer.last_name,
-          company_name: customer.company_name ?? '',
-          national_code: customer.national_code ?? '',
-          mobile: customer.mobile,
-          phone: customer.phone ?? '',
-          email: customer.email ?? '',
-          province: customer.province ?? 'تهران',
-          city: customer.city ?? 'تهران',
-          address: customer.address ?? '',
-          notes: customer.notes ?? '',
-        })
-      } else {
-        reset({
-          customer_type: 'potential',
-          type: 'individual',
-          first_name: '',
-          last_name: '',
-          company_name: '',
-          national_code: '',
-          mobile: '',
-          phone: '',
-          email: '',
-          province: 'تهران',
-          city: 'تهران',
-          address: '',
-          notes: '',
-        })
-      }
+    if (!open) return
+
+    if (customer) {
+      reset({
+        customer_type: customer.customer_type,
+        type: customer.type,
+        first_name: customer.first_name ?? '',
+        last_name: customer.last_name ?? '',
+        company_name: customer.company_name ?? '',
+        national_code: customer.national_code ?? '',
+        mobile: customer.mobile ?? '',
+        phone: customer.phone ?? '',
+        email: customer.email ?? '',
+        province: customer.province ?? 'تهران',
+        city: customer.city ?? 'تهران',
+        address: customer.address ?? '',
+        notes: customer.notes ?? '',
+      })
+      return
     }
+
+    reset(EMPTY_VALUES)
   }, [open, customer, reset])
 
   const type = watch('type')
@@ -137,9 +167,7 @@ export function CustomerFormModal({ open, onClose, customer, onSuccess }: Custom
   const city = watch('city')
 
   // Available cities based on current province
-  const availableCities = useMemo(() => {
-    return getCitiesByProvince(province)
-  }, [province])
+  const availableCities = useMemo(() => getCitiesByProvince(province), [province])
 
   const handleProvinceChange = (newProvince: string) => {
     setValue('province', newProvince)
@@ -153,18 +181,37 @@ export function CustomerFormModal({ open, onClose, customer, onSuccess }: Custom
 
   const onSubmit = async (values: FormValues) => {
     try {
+      const payload = {
+        ...values,
+        first_name: values.type === 'company' ? values.first_name || '' : values.first_name,
+        last_name: values.type === 'company' ? values.last_name || '' : values.last_name,
+        company_name: values.company_name || '',
+        mobile: values.mobile || '',
+        national_code: values.national_code || '',
+      }
+
       if (customer) {
-        await customerApi.update(customer.id, values)
+        await customerApi.update(customer.id, payload)
         toast.success('مشخصات مشتری بروزرسانی شد.')
       } else {
-        await customerApi.create(values)
+        await customerApi.create(payload)
         toast.success('مشتری جدید با موفقیت ثبت شد.')
       }
       onSuccess()
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'خطا در ذخیره اطلاعات مشتری'
-      toast.error(msg)
+      const serverErrors = err.response?.data?.errors
+      const firstServerError = serverErrors ? Object.values(serverErrors)[0] : null
+      const msg =
+        (Array.isArray(firstServerError) ? firstServerError[0] : firstServerError) ||
+        err.response?.data?.message ||
+        'خطا در ذخیره اطلاعات مشتری'
+      toast.error(String(msg))
     }
+  }
+
+  const digitOnly = (e: React.FormEvent<HTMLInputElement>, maxLength: number) => {
+    const input = e.currentTarget
+    input.value = toEnDigits(input.value).replace(/\D/g, '').slice(0, maxLength)
   }
 
   return (
@@ -217,66 +264,84 @@ export function CustomerFormModal({ open, onClose, customer, onSuccess }: Custom
           </div>
         </div>
 
+        {type === 'company' && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-[11px] leading-relaxed text-blue-950 dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-200">
+            برای مشتری حقوقی فقط <b>نام شرکت</b> الزامی است؛ نام و نام‌خانوادگی و شماره همراه اختیاری هستند.
+          </div>
+        )}
+
+        {/* Company name (required for company, optional for individual) */}
+        <Field
+          label="نام شرکت / کارگاه"
+          required={type === 'company'}
+          error={errors.company_name?.message}
+          hint={type === 'individual' ? 'در صورت ثبت به نام یک شرکت یا کارگاه، این فیلد را پر کنید.' : undefined}
+        >
+          <input
+            className="input input-bordered w-full"
+            {...register('company_name')}
+            placeholder="نام ثبتی شرکت یا کارگاه"
+          />
+        </Field>
+
         {/* Name Fields */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="نام" required error={errors.first_name?.message}>
-            <input className="input input-bordered w-full" {...register('first_name')} placeholder="مثال: حمید" />
-          </Field>
-          <Field label="نام خانوادگی" required error={errors.last_name?.message}>
-            <input className="input input-bordered w-full" {...register('last_name')} placeholder="مثال: رضایی" />
-          </Field>
-        </div>
-
-        {/* Company & National Code */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {type === 'company' && (
-            <Field label="نام شرکت / کارگاه" error={errors.company_name?.message}>
-              <input className="input input-bordered w-full" {...register('company_name')} placeholder="نام ثبتی شرکت" />
-            </Field>
-          )}
-          <Field
-            label={type === 'company' ? 'شناسه ملی شرکت (۱۱ رقم)' : 'کد ملی (۱۰ رقم)'}
-            error={errors.national_code?.message}
-            className={type === 'individual' ? 'sm:col-span-2' : ''}
-          >
+          <Field label="نام" required={type === 'individual'} error={errors.first_name?.message}>
             <input
-              dir="ltr"
-              maxLength={type === 'company' ? 11 : 10}
-              className="input input-bordered w-full text-start font-mono"
-              placeholder={type === 'company' ? 'مثال: 10100123456' : 'مثال: 0012345678'}
-              {...register('national_code', {
-                onChange: (e) => {
-                  e.target.value = e.target.value.replace(/\D/g, '')
-                },
-              })}
-              onKeyDown={(e) => {
-                if (
-                  e.ctrlKey ||
-                  e.metaKey ||
-                  ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'].includes(e.key)
-                ) {
-                  return
-                }
-                if (!/^\d$/.test(e.key)) {
-                  e.preventDefault()
-                }
-              }}
+              className="input input-bordered w-full"
+              {...register('first_name')}
+              placeholder={type === 'company' ? 'نام رابط (اختیاری)' : 'مثال: حمید'}
+            />
+          </Field>
+          <Field label="نام خانوادگی" required={type === 'individual'} error={errors.last_name?.message}>
+            <input
+              className="input input-bordered w-full"
+              {...register('last_name')}
+              placeholder={type === 'company' ? 'نام خانوادگی رابط (اختیاری)' : 'مثال: رضایی'}
             />
           </Field>
         </div>
 
-        {/* Contact Numbers */}
+        {/* National Code */}
+        <Field
+          label={type === 'company' ? 'شناسه ملی شرکت (۱۱ رقم - اختیاری)' : 'کد ملی (۱۰ رقم - اختیاری)'}
+          error={errors.national_code?.message}
+        >
+          <input
+            dir="ltr"
+            className="input input-bordered w-full text-start font-mono"
+            placeholder={type === 'company' ? 'مثال: 10100123456' : 'مثال: 0012345678'}
+            {...register('national_code', {
+              onChange: (e) => digitOnly(e, type === 'company' ? 11 : 10),
+            })}
+            onKeyDown={(e) => {
+              if (
+                e.ctrlKey ||
+                e.metaKey ||
+                ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'].includes(e.key)
+              ) {
+                return
+              }
+              if (!/^\d$/.test(e.key) && !/^[۰-۹]$/.test(e.key)) {
+                e.preventDefault()
+              }
+            }}
+          />
+        </Field>
+
+        {/* Contact Numbers — mobile is optional in both person types */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Field label="شماره همراه (۱۱ رقم با 09)" required error={errors.mobile?.message}>
+          <Field
+            label="شماره همراه (اختیاری)"
+            error={errors.mobile?.message}
+            hint="در صورت وارد کردن، ۱۱ رقم و با 09 شروع شود."
+          >
             <input
               dir="ltr"
-              maxLength={11}
-              className="input input-bordered w-full text-start font-mono"
+              className="input input-bordered w-full text-start"
               placeholder="09123456789"
               {...register('mobile', {
-                onChange: (e) => {
-                  e.target.value = e.target.value.replace(/\D/g, '')
-                },
+                onChange: (e) => digitOnly(e, 11),
               })}
               onKeyDown={(e) => {
                 if (
@@ -286,7 +351,7 @@ export function CustomerFormModal({ open, onClose, customer, onSuccess }: Custom
                 ) {
                   return
                 }
-                if (!/^\d$/.test(e.key)) {
+                if (!/^\d$/.test(e.key) && !/^[۰-۹]$/.test(e.key)) {
                   e.preventDefault()
                 }
               }}
@@ -295,13 +360,10 @@ export function CustomerFormModal({ open, onClose, customer, onSuccess }: Custom
           <Field label="تلفن ثابت (۱۱ رقم با 0)" error={errors.phone?.message}>
             <input
               dir="ltr"
-              maxLength={11}
-              className="input input-bordered w-full text-start font-mono"
+              className="input input-bordered w-full text-start"
               placeholder="02188776655"
               {...register('phone', {
-                onChange: (e) => {
-                  e.target.value = e.target.value.replace(/\D/g, '')
-                },
+                onChange: (e) => digitOnly(e, 11),
               })}
               onKeyDown={(e) => {
                 if (
@@ -311,14 +373,20 @@ export function CustomerFormModal({ open, onClose, customer, onSuccess }: Custom
                 ) {
                   return
                 }
-                if (!/^\d$/.test(e.key)) {
+                if (!/^\d$/.test(e.key) && !/^[۰-۹]$/.test(e.key)) {
                   e.preventDefault()
                 }
               }}
             />
           </Field>
           <Field label="ایمیل" error={errors.email?.message}>
-            <input type="email" dir="ltr" className="input input-bordered w-full text-start" {...register('email')} placeholder="name@domain.com" />
+            <input
+              type="email"
+              dir="ltr"
+              className="input input-bordered w-full text-start"
+              {...register('email')}
+              placeholder="name@domain.com"
+            />
           </Field>
         </div>
 
@@ -345,11 +413,21 @@ export function CustomerFormModal({ open, onClose, customer, onSuccess }: Custom
         </div>
 
         <Field label="آدرس پستی">
-          <textarea rows={2} className="textarea textarea-bordered w-full" {...register('address')} placeholder="آدرس کارخانه یا محل نصب قطعات..." />
+          <textarea
+            rows={2}
+            className="textarea textarea-bordered w-full"
+            {...register('address')}
+            placeholder="آدرس کارخانه یا محل نصب دستگاه‌ها..."
+          />
         </Field>
 
         <Field label="یادداشت و توضیحات">
-          <textarea rows={2} className="textarea textarea-bordered w-full" {...register('notes')} placeholder="توضیحات تکمیلی یا نیازهای فنی مشتری..." />
+          <textarea
+            rows={2}
+            className="textarea textarea-bordered w-full"
+            {...register('notes')}
+            placeholder="توضیحات تکمیلی یا نیازهای فنی مشتری..."
+          />
         </Field>
       </form>
     </Modal>

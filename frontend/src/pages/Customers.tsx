@@ -46,11 +46,15 @@ export default function Customers() {
   const [deleting, setDeleting] = useState<Customer | null>(null)
   const [exporting, setExporting] = useState(false)
 
-  const handleExport = async () => {
+  const handleExport = async (format: 'xlsx' | 'csv' = 'xlsx') => {
     setExporting(true)
     try {
-      await customerApi.downloadExport(customerType === 'all' ? undefined : customerType)
-      toast.success('فایل خروجی اکسل با موفقیت دانلود شد.')
+      await customerApi.downloadExport(customerType === 'all' ? undefined : customerType, format)
+      toast.success(
+        format === 'csv'
+          ? 'فایل CSV با کدگذاری UTF-8 BOM دانلود شد.'
+          : 'فایل خروجی اکسل با موفقیت دانلود شد.',
+      )
     } catch {
       toast.error('خطا در دانلود فایل خروجی اکسل')
     } finally {
@@ -109,23 +113,36 @@ export default function Customers() {
     <div className="space-y-6">
       <PageHeader
         title="مدیریت مشتریان"
-        subtitle="فهرست مشتریان بالقوه و بالفعل، قطعات تخصیص‌یافته و پرونده مشتریان"
+        subtitle="فهرست مشتریان بالقوه و بالفعل، دستگاه‌های تخصیص‌یافته و پرونده مشتریان"
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Can permission="customers.export">
-              <button
-                type="button"
-                onClick={handleExport}
-                disabled={exporting}
-                className="btn btn-sm gap-1.5"
-              >
-                {exporting ? (
-                  <span className="loading loading-spinner loading-xs" />
-                ) : (
-                  <Download className="size-4" />
-                )}
-                خروجی اکسل
-              </button>
+              <div className="join">
+                <button
+                  type="button"
+                  onClick={() => handleExport('xlsx')}
+                  disabled={exporting}
+                  className="btn btn-sm join-item gap-1.5"
+                  title="خروجی اکسل همراه با دستگاه‌ها، شماره و مبلغ فاکتورها"
+                >
+                  {exporting ? (
+                    <span className="loading loading-spinner loading-xs" />
+                  ) : (
+                    <Download className="size-4" />
+                  )}
+                  خروجی اکسل
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExport('csv')}
+                  disabled={exporting}
+                  className="btn btn-sm join-item gap-1.5"
+                  title="خروجی CSV با UTF-8 BOM برای فارسی سالم در Excel"
+                >
+                  <FileSpreadsheet className="size-4" />
+                  CSV
+                </button>
+              </div>
             </Can>
             <Can permission="customers.import">
               <button className="btn btn-sm" onClick={() => setImportOpen(true)}>
@@ -171,7 +188,7 @@ export default function Customers() {
             }}
           >
             <UserCheck className="size-3.5 text-emerald-600" />
-            مشتریان بالفعل (خریدار قطعه)
+            مشتریان بالفعل (خریدار دستگاه)
           </button>
           <button
             role="tab"
@@ -230,7 +247,7 @@ export default function Customers() {
                   <th>وضعیت مشتری</th>
                   <th>اطلاعات تماس</th>
                   <th>شهر و استان</th>
-                  <th>قطعات تخصیص‌یافته</th>
+                  <th>دستگاه‌های تخصیص‌یافته</th>
                   <th>تاریخ ثبت</th>
                   <th className="text-end">عملیات</th>
                 </tr>
@@ -255,9 +272,14 @@ export default function Customers() {
                             to={`/customers/${c.id}`}
                             className="font-bold text-sm text-base-content hover:text-primary transition-colors"
                           >
-                            {c.first_name} {c.last_name}
+                            {c.full_name || `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim()}
                           </Link>
-                          {c.company_name && (
+                          {c.type === 'company' && (c.first_name || c.last_name) && (
+                            <p className="text-xs text-base-content/50 truncate max-w-[180px]">
+                              {c.first_name} {c.last_name}
+                            </p>
+                          )}
+                          {c.type !== 'company' && c.company_name && (
                             <p className="text-xs text-base-content/50 truncate max-w-[180px]">{c.company_name}</p>
                           )}
                         </div>
@@ -291,7 +313,7 @@ export default function Customers() {
                         className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline"
                       >
                         <Cpu className="size-3.5" />
-                        {num(c.customer_parts_count ?? 0)} قطعه
+                        {num(c.devices_quantity ?? c.customer_parts_count ?? 0)} دستگاه
                       </Link>
                     </td>
 
@@ -371,7 +393,7 @@ export default function Customers() {
         onClose={() => setDeleting(null)}
         onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
         title="حذف پرونده مشتری"
-        message={`آیا از حذف مشتری «${deleting?.first_name} ${deleting?.last_name}» اطمینان دارید؟ تمام سوابق و قطعات تخصیص یافته به این مشتری نیز حذف خواهند شد.`}
+        message={`آیا از حذف مشتری «${deleting?.full_name || `${deleting?.first_name ?? ''} ${deleting?.last_name ?? ''}`}» اطمینان دارید؟ تمام سوابق و دستگاه‌های تخصیص‌یافته به این مشتری نیز حذف و موجودی آن‌ها به انبار برگشت داده می‌شود.`}
         confirmText="بله، حذف کن"
         tone="error"
         loading={deleteMutation.isPending}

@@ -68,6 +68,9 @@ mkdir -p "$APP/public"
 for file in index.php private-path.php resolve-private.php; do
   cp "$ROOT/backend/public/$file" "$APP/public/$file"
 done
+# فونت وزیرمتن FD و استایل سراسری پنل مدیریت (Filament) باید در بسته انتشار باشند.
+if [[ -d "$ROOT/backend/public/css" ]]; then cp -R "$ROOT/backend/public/css" "$APP/public/css"; fi
+if [[ -d "$ROOT/backend/public/fonts" ]]; then cp -R "$ROOT/backend/public/fonts" "$APP/public/fonts"; fi
 (cd "$ROOT/frontend" && tar -cf - src index.html package.json package-lock.json tsconfig.json tsconfig.app.json tsconfig.node.json vite.config.ts) | (cd "$FRONT" && tar -xf -)
 if [[ -d "$ROOT/frontend/public" ]]; then cp -R "$ROOT/frontend/public" "$FRONT/"; fi
 if [[ -n "$(find "$APP" "$FRONT" -type l -print -quit)" ]]; then
@@ -139,6 +142,8 @@ for file in index.php index.html .htaccess resolve-private.php private-path.php 
   [[ -s "$PUBLIC/$file" ]] || fail "Missing public release file: $file"
 done
 [[ -d "$PUBLIC/css/filament" && -d "$PUBLIC/js/filament" ]] || fail 'Filament assets were not published by Composer scripts.'
+[[ -s "$PUBLIC/css/vazirmatn.css" ]] || fail 'Vazirmatn FD stylesheet is missing from backend/public/css.'
+[[ -f "$PUBLIC/fonts/Vazirmatn-FD-Regular.woff2" ]] || fail 'Vazirmatn FD webfonts are missing from backend/public/fonts.'
 if [[ -n "$(find "$APP" "$PUBLIC" -type l -print -quit)" ]]; then fail 'Release contains a symlink.'; fi
 
 STEP='ZIP verification'
