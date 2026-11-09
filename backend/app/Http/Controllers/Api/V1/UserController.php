@@ -114,6 +114,12 @@ class UserController extends Controller
             'avatar.max' => 'حداکثر حجم تصویر ۳ مگابایت است.',
         ]);
 
+        $callingUser = auth()->user();
+        $resolvedType = $validated['user_type'] ?? ($callingUser->isAdministrator() ? 'manager' : 'salesperson');
+        if (!$callingUser->isAdministrator() && !in_array($resolvedType, ['salesperson', 'installer'], true)) {
+            abort(403, 'ایجاد مدیر فقط برای مدیر ارشد مجاز است.');
+        }
+
         $avatarPath = null;
         if ($request->hasFile('avatar')) {
             $avatarPath = $request->file('avatar')->store('avatars', 'public');
@@ -128,13 +134,6 @@ class UserController extends Controller
             'is_active' => $request->boolean('is_active', true),
         ]);
 
-        // Determine user_type: only administrators can create other administrators
-        $callingUser = auth()->user();
-        if ($callingUser && $callingUser->isAdministrator()) {
-            $resolvedType = $validated['user_type'] ?? 'manager';
-        } else {
-            $resolvedType = 'manager';
-        }
         $user->user_type = $resolvedType;
         $user->save();
 

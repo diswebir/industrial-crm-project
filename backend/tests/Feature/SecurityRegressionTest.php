@@ -120,4 +120,16 @@ class SecurityRegressionTest extends TestCase
         $this->assertNotEmpty($import->getErrors());
     }
 
+    public function test_manager_can_create_only_restricted_types(): void
+    {
+        $manager = $this->user('manager@example.test');
+        Permission::findOrCreate('users.manage', 'web');
+        $manager->givePermissionTo('users.manage');
+        Sanctum::actingAs($manager);
+        $payload = ['name' => 'New user', 'email' => 'new@example.test', 'password' => 'Password123', 'user_type' => 'manager', 'sync_permissions' => true];
+        $this->postJson('/api/v1/users', $payload)->assertForbidden();
+        $payload['user_type'] = 'installer';
+        $this->postJson('/api/v1/users', $payload)->assertCreated()->assertJsonPath('user.user_type', 'installer');
+    }
+
 }

@@ -70,7 +70,7 @@ export default function CreateUserPage() {
       phone: '',
       password: '',
       is_active: true,
-      user_type: 'manager',
+      user_type: isAdministrator ? 'manager' : 'salesperson',
     },
   })
 
@@ -224,13 +224,13 @@ export default function CreateUserPage() {
               <p className="font-bold text-xs text-base-content">نوع کاربری (نقش سیستمی)</p>
               <p className="text-[11px] text-base-content/60 mt-0.5">
                 {isAdministrator
-                  ? 'تعیین سطح کاربری: مدیر ارشد یا مدیر عادی سامانه'
-                  : 'کاربران ایجاد شده توسط شما با سطح دسترسی «مدیر» تعریف می‌شوند.'}
+                  ? 'نوع کاربری را انتخاب کنید.'
+                  : 'فقط نقش‌های محدود فروشنده و نصاب قابل ایجاد هستند.'}
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-              <label
+              {isAdministrator && <label
                 className={cx(
                   'flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition-all',
                   watch('user_type') === 'manager'
@@ -248,9 +248,9 @@ export default function CreateUserPage() {
                   <p className="font-bold text-xs text-base-content">مدیر (Manager)</p>
                   <p className="text-[11px] text-base-content/60">کاربر عملیاتی با مجوزهای تعیین‌شده</p>
                 </div>
-              </label>
+              </label>}
 
-              {isAdministrator && (['salesperson', 'installer'] as const).map((role) => (
+              {(['salesperson', 'installer'] as const).map((role) => (
                 <label key={role} className="flex items-center gap-3 rounded-xl border p-3 cursor-pointer">
                   <input type="radio" value={role} className="radio radio-primary radio-sm" {...register('user_type', { onChange: () => setSelectedPerms(role === 'salesperson' ? ['customers.view', 'customers.create', 'customers.edit', 'parts.view', 'parts.assign'] : ['customers.view', 'parts.view', 'parts.history']) })} />
                   <span>{role === 'salesperson' ? 'کارمند فروش' : 'نصاب'}</span>
