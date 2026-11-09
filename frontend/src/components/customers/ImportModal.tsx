@@ -2,8 +2,9 @@ import { useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { AlertCircle, CheckCircle2, Download, FileSpreadsheet, Upload, XCircle } from 'lucide-react'
 import { Modal } from '../ui/Modal'
-import { customerApi } from '../../services/api'
-import { cx, num } from '../../utils/format'
+import { apiErrorMessage, customerApi } from '../../services/api'
+import { cx, digits, num } from '../../utils/format'
+import type { ImportResult } from '../../types'
 
 interface ImportModalProps {
   open: boolean
@@ -15,7 +16,7 @@ export function ImportModal({ open, onClose, onSuccess }: ImportModalProps) {
   const [file, setFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
   const [drag, setDrag] = useState(false)
-  const [importResult, setImportResult] = useState<{ imported_count: number; errors: string[] } | null>(null)
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [downloadingTemplate, setDownloadingTemplate] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -55,20 +56,20 @@ export function ImportModal({ open, onClose, onSuccess }: ImportModalProps) {
     try {
       const res = await customerApi.importExcel(file)
       setImportResult({
-        imported_count: res.imported_count,
+        message: res.message,
+        imported_count: res.imported_count ?? 0,
+        created_count: res.created_count ?? 0,
+        updated_count: res.updated_count ?? 0,
         errors: res.errors || [],
+        warnings: res.warnings || [],
       })
       toast.success(res.message)
-      if (!res.errors || res.errors.length === 0) {
-        setTimeout(() => {
-          onSuccess()
-          close()
-        }, 1500)
-      } else {
-        onSuccess()
+      onSuccess()
+      if (!(res.errors || []).length && !(res.warnings || []).length) {
+        setTimeout(() => close(), 1500)
       }
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'خطا در بارگذاری و پردازش فایل اکسل')
+      toast.error(apiErrorMessage(err, 'خطا در بارگذاری و پردازش فایل اکسل'))
     } finally {
       setBusy(false)
     }
@@ -118,8 +119,14 @@ export function ImportModal({ open, onClose, onSuccess }: ImportModalProps) {
               </span>
               <div>
                 <p className="font-bold text-base">فایل اکسل (.xlsx) را اینجا رها کنید یا کلیک نمایید</p>
-                <p className="text-xs text-base-content/60 mt-1">
-                  ستون‌های فایل: نوع مشتری (بالقوه/بالفعل)، نام، نام خانوادگی، شماره همراه، شرکت، شهر و...
+                <p className="mt-1 text-xs text-base-content/60">
+                  ستون‌های فایل: وضعیت مشتری (بالقوه/بالفعل)، نوع شخصیت (حقیقی/حقوقی)، نام، نام خانوادگی، نام شرکت،
+                  کد ملی/شناسه ملی، شماره همراه، تلفن، ایمیل، استان، شهر، آدرس و یادداشت.
+                </p>
+                <p className="mt-1 text-[11px] text-base-content/50">
+                  برای شخصیت حقوقی فقط «نام شرکت» الزامی است و «شماره همراه» در هر دو حالت اختیاری است.
+                  ترتیب ستون‌ها یا عنوان فارسی/انگلیسی آن‌ها تفاوتی ایجاد نمی‌کند؛ مشتریان تکراری بر اساس شماره
+                  همراه، کد ملی یا نام شرکت شناسایی و بروزرسانی می‌شوند.
                 </p>
               </div>
               <input
@@ -141,7 +148,9 @@ export function ImportModal({ open, onClose, onSuccess }: ImportModalProps) {
                 <FileSpreadsheet className="size-8 text-emerald-600" />
                 <div>
                   <p className="text-xs font-bold">فایل نمونه اکسل استاندارد</p>
-                  <p className="text-[11px] text-base-content/60">دارای ستون‌های استاندارد و نمونه ردیف‌های بالفعل و بالقوه</p>
+                  <p className="text-[11px] text-base-content/60">
+                    دارای ستون‌های استاندارد، برگه راهنما و سه ردیف نمونه (حقیقی، حقوقی و حقوقی بدون شماره همراه)
+                  </p>
                 </div>
               </div>
               <button
@@ -179,18 +188,35 @@ export function ImportModal({ open, onClose, onSuccess }: ImportModalProps) {
               <div className="space-y-3">
                 <div className="alert alert-success">
                   <CheckCircle2 className="size-5" />
-                  <span>تعداد {num(importResult.imported_count)} مشتری با موفقیت وارد/بروزرسانی شد.</span>
+                  <span>
+                    {num(importResult.imported_count)} مشتری پردازش شد: {num(importResult.created_count)} مشتری جدید
+                    ثبت و {num(importResult.updated_count)} مشتری بروزرسانی شد.
+                  </span>
                 </div>
 
                 {importResult.errors.length > 0 && (
-                  <div className="rounded-xl border border-warning/30 bg-warning/5 p-4 space-y-2">
-                    <p className="font-bold text-xs text-warning-content flex items-center gap-1.5">
-                      <AlertCircle className="size-4" />
-                      هشدارهای سطرهای نامعتبر ({num(importResult.errors.length)} سطر نادیده گرفته شد):
+                  <div className="space-y-2 rounded-xl border border-error/30 bg-error/5 p-4">
+                    <p className="flex items-center gap-1.5 text-xs font-bold text-error">
+                      <XCircle className="size-4" />
+                      سطرهای ناموفق ({digits(importResult.errors.length)} سطر نادیده گرفته شد):
                     </p>
-                    <ul className="text-xs text-base-content/70 space-y-1 list-disc list-inside max-h-40 overflow-y-auto">
+                    <ul className="max-h-40 list-inside list-disc space-y-1 text-xs text-base-content/70">
                       {importResult.errors.map((err, i) => (
                         <li key={i}>{err}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {importResult.warnings.length > 0 && (
+                  <div className="space-y-2 rounded-xl border border-warning/30 bg-warning/5 p-4">
+                    <p className="flex items-center gap-1.5 text-xs font-bold text-warning-content">
+                      <AlertCircle className="size-4" />
+                      هشدارها ({digits(importResult.warnings.length)} مورد — این ردیفها ثبت شدند):
+                    </p>
+                    <ul className="max-h-40 list-inside list-disc space-y-1 text-xs text-base-content/70">
+                      {importResult.warnings.map((warn, i) => (
+                        <li key={i}>{warn}</li>
                       ))}
                     </ul>
                   </div>

@@ -3,10 +3,20 @@
 namespace App\Exports;
 
 use Maatwebsite\Excel\Concerns\FromArray;
-use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class CustomersTemplateExport implements FromArray, WithHeadings, ShouldAutoSize
+/**
+ * فایل نمونه (Template) ورود گروهی مشتریان.
+ *
+ * v2.0.0 — تسک ۵: شماره همراه دیگر اجباری نیست و برای شخصیت حقوقی،
+ * «نام شرکت» اجباری و «نام/نام خانوادگی» اختیاری است.
+ */
+class CustomersTemplateExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyles, WithEvents
 {
     public function headings(): array
     {
@@ -24,6 +34,7 @@ class CustomersTemplateExport implements FromArray, WithHeadings, ShouldAutoSize
             'شهر',
             'آدرس',
             'یادداشت',
+            'راهنما',
         ];
     }
 
@@ -43,7 +54,8 @@ class CustomersTemplateExport implements FromArray, WithHeadings, ShouldAutoSize
                 'تهران',
                 'تهران',
                 'خیابان مطهری، پلاک ۱۲',
-                'مشتری فعال خط تولید قطعات صنعتی',
+                'مشتری فعال خط تولید دستگاه‌های صنعتی',
+                'در شخصیت حقوقی: «نام شرکت» اجباری و «نام/نام خانوادگی/موبایل» اختیاری است.',
             ],
             [
                 'بالقوه',
@@ -58,8 +70,41 @@ class CustomersTemplateExport implements FromArray, WithHeadings, ShouldAutoSize
                 'اصفهان',
                 'نجف‌آباد',
                 'بلوار صنعت، کوچه امید',
-                'علاقه‌مند به تهیه قطعه پمپ هیدرولیک',
+                'علاقه‌مند به تهیه دستگاه پرس هیدرولیک',
+                'در شخصیت حقیقی: «نام» و «نام خانوادگی» اجباری است.',
             ],
+            [
+                'بالقوه',
+                'حقوقی',
+                '',
+                '',
+                'شرکت مهندسی پارس تراش',
+                '',
+                '',
+                '02633445566',
+                '',
+                'البرز',
+                'کرج',
+                'شهرک صنعتی سیمین دشت',
+                'فقط با نام شرکت و بدون شماره همراه ثبت شده است',
+                'نمونه مشتری حقوقی بدون نام شخص و بدون شماره همراه (کاملاً معتبر است).',
+            ],
+        ];
+    }
+
+    public function styles(Worksheet $sheet)
+    {
+        return [
+            1 => ['font' => ['bold' => true]],
+        ];
+    }
+
+    public function registerEvents(): array
+    {
+        return [
+            AfterSheet::class => function (AfterSheet $event) {
+                $event->sheet->getDelegate()->getSheetView()->setRightToLeft(true);
+            },
         ];
     }
 }

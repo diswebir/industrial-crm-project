@@ -1,17 +1,30 @@
 import axios from 'axios'
 import type {
+  AclRole,
+  AclScopeOption,
   Customer,
-  Part,
   CustomerPart,
+  CustomerType,
+  DashboardStats,
+  ImportResult,
+  InventoryLog,
+  InventoryLogType,
+  InventoryReconciliationRow,
+  InventorySummary,
+  Paginated,
+  Part,
   PartServiceHistory,
+  ResourceName,
+  Resources,
+  SelectableCustomer,
+  SelectableStaff,
   SmsLog,
   SmsSettings,
   SystemPermission,
   User,
-  DashboardStats,
-  ResourceName,
-  Resources,
+  UserRole,
   CompanySettings,
+  CustomerScope,
 } from '../types'
 
 export const http = axios.create({
@@ -42,6 +55,26 @@ http.interceptors.response.use(
     return Promise.reject(err)
   },
 )
+
+/** پیام خطای فارسی برگردانده‌شده از سمت سرور (۴۲۲/۴۰۳/…) را استخراج می‌کند */
+export function apiErrorMessage(err: any, fallback = 'انجام عملیات ناموفق بود.'): string {
+  const data = err?.response?.data
+  if (!data) return fallback
+  if (typeof data === 'string' && data.trim()) return data
+  if (data.message) {
+    const errors = data.errors
+    if (errors && typeof errors === 'object') {
+      const first = Object.values(errors)[0]
+      if (Array.isArray(first) && first[0]) return `${data.message} — ${first[0]}`
+    }
+    return data.message
+  }
+  if (data.errors) {
+    const first = Object.values(data.errors)[0]
+    if (Array.isArray(first) && first[0]) return String(first[0])
+  }
+  return fallback
+}
 
 // API Services
 export const authApi = {
@@ -81,9 +114,19 @@ export const dashboardApi = {
   },
 }
 
+export interface CustomerListParams {
+  customer_type?: CustomerType | string
+  type?: string
+  q?: string
+  page?: number
+  per_page?: number
+  owner_id?: number | string
+  created_by_user_id?: number | string
+}
+
 export const customerApi = {
-  list: async (params?: { customer_type?: string; q?: string; page?: number; per_page?: number }) => {
-    const { data } = await http.get<{ data: Customer[]; current_page: number; last_page: number; total: number }>('/customers', { params })
+  list: async (params?: CustomerListParams) => {
+    const { data } = await http.get<Paginated<Customer>>('/customers', { params })
     return data
   },
   get: async (id: number | string) => {
@@ -105,7 +148,7 @@ export const customerApi = {
   importExcel: async (file: File) => {
     const formData = new FormData()
     formData.append('file', file)
-    const { data } = await http.post<{ message: string; imported_count: number; errors: string[] }>('/customers/import', formData)
+    const { data } = await http.post<ImportResult>('/customers/import', formData)
     return data
   },
   exportExcelUrl: (customerType?: string) => {
@@ -144,9 +187,29 @@ export const customerApi = {
   },
 }
 
+/** بدنه درخواست تخصیص دستگاه به مشتری (تسک ۳) */
+export interface AssignPartPayload {
+  part_id: number | string
+  serial_number: string
+  quantity?: number
+  invoice_number?: string | null
+  invoice_amount?: number | string | null
+  installation_date?: string | null
+  warranty_expire_date?: string | null
+  status?: string
+  notes?: string | null
+}
+
+/** بدنه ویرایش تخصیص دستگاه (part_id قابل تغییر نیست) */
+export type UpdateAssignmentPayload = Partial<Omit<AssignPartPayload, 'part_id'>>
+
 export const partApi = {
-  list: async (params?: { q?: string }) => {
+  list: async (params?: { q?: string; active?: boolean | 0 | 1; low_stock?: boolean | 0 | 1 }) => {
     const { data } = await http.get<Part[]>('/parts', { params })
+    return data
+  },
+  get: async (id: number | string) => {
+    const { data } = await http.get<Part>(`/parts/${id}`)
     return data
   },
   create: async (body: Partial<Part>) => {
@@ -161,12 +224,98 @@ export const partApi = {
     const { data } = await http.delete<{ message: string }>(`/parts/${id}`)
     return data
   },
-  assignPart: async (customerId: number | string, body: { part_id: number | string; serial_number: string; installation_date?: string; notes?: string }) => {
-    const { data } = await http.post<{ message: string; customer_part: CustomerPart; customer_type: string }>(`/customers/${customerId}/parts`, body)
+  /** تخصیص دستگاه به مشتری — تعداد + مبلغ/شماره فاکتور (تسک ۳) + کسر خودکار از انبار (تسک ۴) */
+  assignPart: async (customerId: number | string, body: AssignPartPayload) => {
+    const { data } = await http.post<{
+      message: string
+      customer_part: CustomerPart
+      customer_type: CustomerType
+      stock_quantity: number
+    }>(`/customers/${customerId}/parts`, body)
     return data
   },
-  addServiceHistory: async (customerPartId: number | string, body: { service_date: string; service_type: string; description: string; cost?: number }) => {
-    const { data } = await http.post<{ message: string; history: PartServiceHistory }>(`/customer-parts/${customerPartId}/history`, body)
+  /** ویرایش تخصیص — بازگرداندن/کسر اختلاف موجودی به‌صورت خودکار انجام می‌شود */
+  updateAssignment: async (customerPartId: number | string, body: UpdateAssignmentPayload) => {
+    const { data } = await http.post<{ message: string; customer_part: CustomerPart; stock_quantity: number }>(
+      `/customer-parts/${customerPartId}`,
+      body,
+    )
+    return data
+  },
+  /** حذف تخصیص — برگشت خودکار موجودی به انبار */
+  deleteAssignment: async (customerPartId: number | string) => {
+    const { data } = await http.delete<{ message: string }>(`/customer-parts/${customerPartId}`)
+    return data
+  },
+  addServiceHistory: async (
+    customerPartId: number | string,
+    body: { service_date: string; service_type: string; description: string; cost?: number | string | null },
+  ) => {
+    const { data } = await http.post<{ message: string; history: PartServiceHistory }>(
+      `/customer-parts/${customerPartId}/history`,
+      body,
+    )
+    return data
+  },
+  updateServiceHistory: async (
+    serviceHistoryId: number | string,
+    body: Partial<{ service_date: string; service_type: string; description: string; cost: number | string | null }>,
+  ) => {
+    const { data } = await http.post<{ message: string; history: PartServiceHistory }>(
+      `/service-histories/${serviceHistoryId}`,
+      body,
+    )
+    return data
+  },
+  deleteServiceHistory: async (serviceHistoryId: number | string) => {
+    const { data } = await http.delete<{ message: string }>(`/service-histories/${serviceHistoryId}`)
+    return data
+  },
+}
+
+export interface InventoryLogFilters {
+  part_id?: number | string
+  customer_id?: number | string
+  user_id?: number | string
+  type?: InventoryLogType | string
+  from?: string
+  to?: string
+  q?: string
+  page?: number
+  per_page?: number
+}
+
+/** انبار و تاریخچه تراکنش‌ها (تسک ۴) */
+export const inventoryApi = {
+  logs: async (params?: InventoryLogFilters) => {
+    const { data } = await http.get<Paginated<InventoryLog>>('/inventory/logs', { params })
+    return data
+  },
+  /** ثبت حرکت دستی: ورود کالا، خروج کالا یا اصلاح موجودی */
+  stock: async (body: {
+    part_id: number | string
+    type: 'in' | 'out' | 'adjustment'
+    quantity: number
+    notes?: string | null
+    reference?: string | null
+    customer_id?: number | string | null
+    customer_part_id?: number | string | null
+  }) => {
+    const { data } = await http.post<{ message: string; log: InventoryLog; part: Part }>('/inventory/stock', body)
+    return data
+  },
+  summary: async () => {
+    const { data } = await http.get<InventorySummary>('/inventory/summary')
+    return data
+  },
+  show: async (partId: number | string, perPage = 10) => {
+    const { data } = await http.get<{ part: Part; logs: Paginated<InventoryLog> }>(`/inventory/parts/${partId}`, {
+      params: { per_page: perPage },
+    })
+    return data
+  },
+  reconciliation: async () => {
+    const { data } = await http.get<{ message: string; items: InventoryReconciliationRow[] }>('/inventory/reconciliation')
     return data
   },
 }
@@ -176,8 +325,8 @@ export const smsApi = {
     const { data } = await http.post<{ message: string; success: boolean; message_id: string; is_sandbox: boolean }>('/sms/send-pattern', body)
     return data
   },
-  getLogs: async (params?: { status?: string; q?: string; page?: number }) => {
-    const { data } = await http.get<{ data: SmsLog[]; current_page: number; last_page: number; total: number }>('/sms/logs', { params })
+  getLogs: async (params?: { status?: string; q?: string; page?: number; per_page?: number }) => {
+    const { data } = await http.get<Paginated<SmsLog>>('/sms/logs', { params })
     return data
   },
 }
@@ -201,6 +350,21 @@ export const settingsApi = {
   },
 }
 
+/** بدنه ساخت/ویرایش کاربر با نقش و دامنه دسترسی (تسک ۱) */
+export interface UserPayload {
+  name: string
+  email: string
+  phone?: string | null
+  password?: string
+  is_active?: boolean
+  user_type?: UserRole
+  customers_scope?: CustomerScope
+  permissions?: string[]
+  accessible_staff_ids?: number[]
+  accessible_customer_ids?: number[]
+  remove_avatar?: boolean | 0 | 1
+}
+
 export const usersApi = {
   list: async () => {
     const { data } = await http.get<any[]>('/users')
@@ -211,11 +375,11 @@ export const usersApi = {
     data.id = String(data.id)
     return data as User
   },
-  create: async (body: FormData | { name: string; email: string; phone?: string; password: string; permissions?: string[] }) => {
+  create: async (body: FormData | UserPayload) => {
     const { data } = await http.post<{ message: string; user: User }>('/users', body)
     return data
   },
-  update: async (id: number | string, body: FormData | { name: string; email: string; phone?: string; password?: string; permissions?: string[]; is_active?: boolean }) => {
+  update: async (id: number | string, body: FormData | UserPayload) => {
     const { data } = await http.post<{ message: string; user: User }>(`/users/${id}`, body)
     return data
   },
@@ -227,12 +391,40 @@ export const usersApi = {
     const { data } = await http.put<{ message: string; permissions: string[] }>(`/users/${userId}/permissions`, { permissions })
     return data
   },
+  /** تغییر دامنه دسترسی به مشتریان + استثنائهای اعطاشده (تسک ۱) */
+  updateAccessScope: async (
+    userId: number | string,
+    body: {
+      customers_scope?: CustomerScope
+      accessible_staff_ids?: number[]
+      accessible_customer_ids?: number[]
+    },
+  ) => {
+    const { data } = await http.put<{ message: string; user: User }>(`/users/${userId}/access-scope`, body)
+    return data
+  },
   toggleActive: async (userId: number | string) => {
     const { data } = await http.patch<{ message: string; is_active: boolean }>(`/users/${userId}/toggle-active`)
     return data
   },
   getAvailablePermissions: async () => {
     const { data } = await http.get<SystemPermission[]>('/permissions')
+    return data
+  },
+}
+
+/** نقش‌ها، دامنه‌ها و فهرست‌های انتخاب برای مدیریت دسترسی (تسک ۱) */
+export const aclApi = {
+  roles: async () => {
+    const { data } = await http.get<{ roles: AclRole[]; scopes: AclScopeOption[] }>('/acl/roles')
+    return data
+  },
+  staff: async () => {
+    const { data } = await http.get<SelectableStaff[]>('/acl/staff')
+    return data
+  },
+  customers: async (q?: string) => {
+    const { data } = await http.get<SelectableCustomer[]>('/acl/customers', { params: q ? { q } : undefined })
     return data
   },
 }

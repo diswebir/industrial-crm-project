@@ -1,0 +1,4 @@
+Vazirmatn Font (Farsi-Digits variant) — Copyright (c) 2015-2024 Saber Rastikerdar.
+Licensed under the SIL Open Font License, Version 1.1.
+Full license text: https://openfontlicense.org / https://github.com/rastikerdar/vazirmatn/blob/master/OFL.txt
+Only the six weights used by this application are redistributed here (Regular, Medium, SemiBold, Bold, ExtraBold, Black).

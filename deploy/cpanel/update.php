@@ -107,10 +107,83 @@ try {
     exit;
 }
 
+/* ─── پاک‌سازی کش‌ها ───
+ * از نسخه ۲٫۰٫۰ فایل‌های پیکربندی جدید (config/acl.php و config/crm.php) و
+ * مجوزهای جدید ACL اضافه شده‌اند. اگر کش پیکربندی یا کش مجوزها (Spatie)
+ * پاک نشود، تغییرات جدید اعمال نمی‌شوند.
+ */
+$cacheLog = [];
+foreach (['config:clear', 'route:clear', 'view:clear', 'cache:clear'] as $command) {
+    try {
+        $code = Illuminate\Support\Facades\Artisan::call($command);
+        $cacheLog[] = $command . ' → ' . ($code === 0 ? 'OK' : 'EXIT ' . $code);
+    } catch (Throwable $e) {
+        $cacheLog[] = $command . ' → SKIPPED (' . $e->getMessage() . ')';
+    }
+}
+
+try {
+    if (class_exists(\Spatie\Permission\PermissionRegistrar::class)) {
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+        $cacheLog[] = 'permission cache reset → OK';
+    }
+} catch (Throwable $e) {
+    $cacheLog[] = 'permission cache reset → SKIPPED (' . $e->getMessage() . ')';
+}
+
+/* ─── بازسازی کش پیکربندی و مسیرها (اختیاری، فقط در صورت موفقیت) ─── */
+foreach (['config:cache', 'route:cache'] as $command) {
+    try {
+        $code = Illuminate\Support\Facades\Artisan::call($command);
+        $cacheLog[] = $command . ' → ' . ($code === 0 ? 'OK' : 'EXIT ' . $code . ' (بدون کش هم کار می‌کند)');
+    } catch (Throwable $e) {
+        $cacheLog[] = $command . ' → SKIPPED (' . $e->getMessage() . ')';
+    }
+}
+
+/* ─── خلاصه وضعیت نسخه و ساختار دیتابیس پس از ارتقا ─── */
+$summary = [];
+try {
+    $summary['نسخه برنامه'] = (string) config('crm.version_name', config('crm.version', 'نامشخص'));
+    $checks = [
+        'customers.created_by_user_id' => ['customers', 'created_by_user_id'],
+        'users.customers_scope'        => ['users', 'customers_scope'],
+        'parts.stock_quantity'         => ['parts', 'stock_quantity'],
+        'customer_parts.quantity'      => ['customer_parts', 'quantity'],
+        'customer_parts.invoice_amount' => ['customer_parts', 'invoice_amount'],
+    ];
+    foreach ($checks as $label => [$table, $column]) {
+        $summary[$label] = Illuminate\Support\Facades\Schema::hasColumn($table, $column) ? 'OK' : 'MISSING';
+    }
+    foreach (['inventory_logs', 'user_staff_access', 'user_customer_access'] as $table) {
+        $summary['table ' . $table] = Illuminate\Support\Facades\Schema::hasTable($table) ? 'OK' : 'MISSING';
+    }
+    $summary['مجوز inventory.manage'] = Illuminate\Support\Facades\DB::table('permissions')
+        ->where('name', 'inventory.manage')->where('guard_name', 'web')->exists() ? 'OK' : 'MISSING';
+    $summary['مجوز inventory.logs'] = Illuminate\Support\Facades\DB::table('permissions')
+        ->where('name', 'inventory.logs')->where('guard_name', 'web')->exists() ? 'OK' : 'MISSING';
+    $summary['تعداد مشتریان (بدون تغییر)'] = (string) Illuminate\Support\Facades\DB::table('customers')->count();
+    $summary['تعداد دستگاه‌ها (بدون تغییر)'] = (string) Illuminate\Support\Facades\DB::table('parts')->count();
+    $summary['تعداد تخصیص‌ها (بدون تغییر)'] = (string) Illuminate\Support\Facades\DB::table('customer_parts')->count();
+} catch (Throwable $e) {
+    $summary['بررسی ساختار'] = 'SKIPPED (' . $e->getMessage() . ')';
+}
+
+$summaryHtml = '';
+foreach ($summary as $label => $value) {
+    $color = $value === 'OK' ? '#16a34a' : (str_contains((string) $value, 'MISSING') ? '#dc2626' : '#0f172a');
+    $summaryHtml .= '<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px dashed #e5e7eb;font-size:13px">'
+        . '<span>' . e((string) $label) . '</span><b style="color:' . $color . '">' . e((string) $value) . '</b></div>';
+}
+
 $selfDeleted = @unlink(__FILE__);
 
 echo page('بروزرسانی انجام شد ✅',
     '<pre>' . e($out) . '</pre>'
     . '<p class="ok">✅ دیتابیس برنامه با موفقیت به‌روزرسانی شد.</p>'
+    . '<div class="note"><b>وضعیت کش‌ها:</b><pre>' . e(implode("\n", $cacheLog)) . '</pre></div>'
+    . '<div class="note"><b>راستی‌آزمایی ساختار پایگاه داده پس از ارتقا:</b>' . $summaryHtml . '</div>'
+    . '<div class="note">💡 گام بعدی: در پنل سامانه به «کاتالوگ دستگاه‌ها ← انبار» بروید و برای هر دستگاه'
+    . ' «ورود کالا» ثبت کنید تا موجودی واقعی انبار مقداردهی شود (موجودی اولیه همه دستگاه‌ها صفر است).</div>'
     . '<div class="note">فایل update.php ' . ($selfDeleted ? 'خودکار حذف شد ✓' : 'خودکار حذف نشد — لطفاً دستی از پوشه public حذفش کن') . '.</div>'
     . '<p><a href="' . e((string) envValue($envPath, 'APP_URL')) . '">← بازگشت به برنامه</a></p>');

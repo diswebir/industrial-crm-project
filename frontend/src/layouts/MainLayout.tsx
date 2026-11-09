@@ -11,7 +11,7 @@ import { Avatar } from '../components/ui/Avatar'
 import { PageSkeleton } from '../components/ui/Field'
 import { useAuthStore } from '../store/useAuthStore'
 import { useThemeStore } from '../store/useThemeStore'
-import { roleLabel } from '../utils/meta'
+import { customerScopeShort, roleLabel, userRoleLabel } from '../utils/meta'
 
 const closeDropdown = () => (document.activeElement as HTMLElement | null)?.blur()
 
@@ -59,13 +59,28 @@ function UserMenu() {
       >
         <span className="hidden text-end leading-tight whitespace-nowrap lg:block">
           <span className="block text-xs font-bold truncate max-w-[110px] xl:max-w-[150px]">{user.name}</span>
-          <span className="block text-[10px] text-base-content/60 truncate max-w-[110px] xl:max-w-[150px]">{roleLabel[user.role || 'admin']}</span>
+          <span className="block text-[10px] text-base-content/60 truncate max-w-[110px] xl:max-w-[150px]">
+            {user.role_label || (user.user_type ? userRoleLabel[user.user_type] : roleLabel[user.role || 'admin'])}
+          </span>
         </span>
         <Avatar name={user.name} src={user.avatar_url} size="md" presence="online" />
       </div>
       <ul tabIndex={0} className="dropdown-content menu z-50 mt-2 w-56 rounded-2xl border border-base-300 bg-base-100 p-2 shadow-xl">
         <li className="menu-title px-3 pb-1">
           <span className="block truncate">{user.email}</span>
+        </li>
+        <li className="px-3 pb-1">
+          <span className="block text-[11px] text-base-content/60">
+            نقش: <b className="text-base-content/80">{user.role_label || (user.user_type ? userRoleLabel[user.user_type] : '—')}</b>
+          </span>
+          <span className="block text-[11px] text-base-content/60">
+            دامنه دسترسی:{' '}
+            <b className="text-base-content/80">
+              {user.customers_scope === 'own' && !user.has_global_customer_access
+                ? customerScopeShort.own
+                : customerScopeShort.all}
+            </b>
+          </span>
         </li>
         <li>
           <button onClick={() => { closeDropdown(); nav('/settings/profile') }}>

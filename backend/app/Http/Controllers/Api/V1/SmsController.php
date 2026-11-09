@@ -16,22 +16,31 @@ class SmsController extends Controller
     }
 
     /**
-     * Send pattern-based SMS to a customer or direct mobile number.
+     * ارسال پیامک الگودار به یک مشتری یا شماره مستقیم.
      */
     public function sendPattern(Request $request): JsonResponse
     {
         $this->authorizePermission('sms.send');
 
         $validated = $request->validate([
-            'mobile' => 'required|string|regex:/^09\d{9}$/',
-            'pattern_code' => 'required|string',
+            'mobile' => ['required', 'string', 'regex:/^09\d{9}$/'],
+            'pattern_code' => 'required|string|max:50',
             'tokens' => 'required|array',
             'customer_id' => 'nullable|exists:customers,id',
+        ], [
+            'mobile.required' => 'شماره گیرنده الزامی است.',
+            'mobile.regex' => 'شماره همراه باید ۱۱ رقم عددی بوده و با 09 شروع شود.',
+            'pattern_code.required' => 'کد الگوی پیامک الزامی است.',
+            'tokens.required' => 'متغیرهای الگوی پیامک الزامی است.',
+            'customer_id.exists' => 'مشتری انتخاب‌شده در سامانه وجود ندارد.',
         ]);
 
-        $customer = isset($validated['customer_id'])
-            ? Customer::find($validated['customer_id'])
-            : null;
+        $customer = null;
+        if (!empty($validated['customer_id'])) {
+            $customer = Customer::find((int) $validated['customer_id']);
+            // کنترل دامنه دسترسی: کارمند فروش نمی‌تواند به مشتریِ دیگران پیامک بفرستد
+            $this->authorizeCustomerAccess($customer, null);
+        }
 
         $result = $this->melipayamakService->sendPattern(
             $validated['mobile'],
@@ -49,20 +58,29 @@ class SmsController extends Controller
     }
 
     /**
-     * View history of dispatched SMS messages.
+     * مشاهده تاریخچه پیامک‌های ارسال‌شده (محدود به مشتریانِ مجاز).
      */
     public function logs(Request $request): JsonResponse
     {
         $this->authorizePermission('sms.logs');
 
+        $user = $this->currentUser();
+
         $query = SmsLog::with('customer')->latest();
+
+        if ($user && !$user->hasGlobalCustomerAccess()) {
+            $query->where(function ($q) use ($user) {
+                $q->whereNull('customer_id')
+                    ->orWhereIn('customer_id', Customer::query()->visibleTo($user)->select('customers.id'));
+            });
+        }
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
         if ($request->filled('q')) {
-            $term = trim($request->q);
+            $term = trim((string) $request->q);
             $op = $this->likeOp();
             $query->where(function ($q) use ($term, $op) {
                 $q->where('recipient_mobile', $op, "%{$term}%")
@@ -76,17 +94,9 @@ class SmsController extends Controller
             });
         }
 
-        $perPage = (int) $request->input('per_page', 20);
-        $logs = $query->paginate($perPage);
+        $perPage = max(1, min(100, (int) $request->input('per_page', 20)));
+        $logs = $query->paginate($perPage)->withQueryString();
 
         return response()->json($logs);
-    }
-
-    protected function authorizePermission(string $permission): void
-    {
-        $user = auth()->user();
-        if (!$user || !$user->hasPermissionTo($permission)) {
-            abort(403, "شما دسترسی لازم ({$permission}) برای این عملیات را ندارید.");
-        }
     }
 }

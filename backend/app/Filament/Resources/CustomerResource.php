@@ -47,21 +47,26 @@ class CustomerResource extends Resource
                     ->required(),
                 Forms\Components\TextInput::make('first_name')
                     ->label('نام')
-                    ->required()
+                    ->required(fn (Forms\Get $get): bool => $get('type') !== 'company')
+                    ->helperText('برای شخصیت حقوقی اختیاری است.')
                     ->maxLength(255),
                 Forms\Components\TextInput::make('last_name')
                     ->label('نام خانوادگی')
-                    ->required()
+                    ->required(fn (Forms\Get $get): bool => $get('type') !== 'company')
+                    ->helperText('برای شخصیت حقوقی اختیاری است.')
                     ->maxLength(255),
                 Forms\Components\TextInput::make('company_name')
                     ->label('نام شرکت / سازمان')
+                    ->required(fn (Forms\Get $get): bool => $get('type') === 'company')
+                    ->helperText('برای شخصیت حقوقی الزامی است.')
                     ->maxLength(255),
                 Forms\Components\TextInput::make('national_code')
                     ->label('کد ملی / شناسه ملی')
                     ->maxLength(20),
                 Forms\Components\TextInput::make('mobile')
                     ->label('شماره همراه')
-                    ->required()
+                    ->tel()
+                    ->helperText('اختیاری — برای هر دو نوع شخصیت حقیقی و حقوقی.')
                     ->maxLength(20),
                 Forms\Components\TextInput::make('phone')
                     ->label('تلفن ثابت')
@@ -82,6 +87,13 @@ class CustomerResource extends Resource
                     ->columnSpanFull(),
                 Forms\Components\Textarea::make('notes')
                     ->label('توضیحات و یادداشت‌ها')
+                    ->columnSpanFull(),
+                Forms\Components\Select::make('created_by_user_id')
+                    ->label('ثبت‌کننده مشتری (مالک پرونده)')
+                    ->relationship('createdBy', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->helperText('پایه اعمال دسترسی کارمندان فروش به مشتریان.')
                     ->columnSpanFull(),
             ]);
     }
@@ -117,6 +129,14 @@ class CustomerResource extends Resource
                 Tables\Columns\TextColumn::make('city')
                     ->label('شهر')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('createdBy.name')
+                    ->label('ثبت‌کننده')
+                    ->searchable()
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('customer_parts_count')
+                    ->label('دستگاه‌های تخصیص‌یافته')
+                    ->counts('customerParts')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('تاریخ ثبت')
                     ->dateTime()

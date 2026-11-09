@@ -54,7 +54,7 @@ export const revenueByCategory = (sales: Sale[], products: Map<string, Product>)
   revenueBy(sales, (_, it) => products.get(it.productId)?.category)
 
 export const revenueByCity = (sales: Sale[], customers: Map<string, Customer>) =>
-  revenueBy(sales, (s) => customers.get(s.customerId)?.city)
+  revenueBy(sales, (s) => customers.get(s.customerId)?.city ?? undefined)
 
 export function topProducts(sales: Sale[], n = 6) {
   const m = new Map<string, { name: string; qty: number; revenue: number }>()

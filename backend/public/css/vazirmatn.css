@@ -1,4 +1,51 @@
-/* Vazirmatn Variable Font for Filament Admin Panel */
+/* ═══════════════════════════════════════════════════════════════════════════
+   وزیرمتن با ارقام فارسی (Vazirmatn FD) — پنل مدیریت Filament
+   در این نسخه گلیف ارقام لاتین (0-9) با ارقام فارسی (۰-۹) جایگزین شده است،
+   بنابراین همه اعداد در پنل مدیریت فارسی نمایش داده می‌شوند در حالی که مقدار
+   ذخیره‌شده در پایگاه داده همان ASCII باقی می‌ماند.
+   فایل‌های فونت در مسیر /fonts/ کنار این فایل قرار دارند.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('/fonts/vazirmatn-fd-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('/fonts/vazirmatn-fd-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('/fonts/vazirmatn-fd-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('/fonts/vazirmatn-fd-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('/fonts/vazirmatn-fd-Black.woff2') format('woff2');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* نسخه متغیر وزیرمتن (بدون ارقام فارسی) فقط به‌عنوان جایگزین در صورت نبود FD */
 @font-face {
   font-family: 'Vazirmatn';
   src: url('/fonts/vazirmatn-arabic-wght-normal.woff2') format('woff2');
@@ -17,6 +64,41 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-body, html, * {
-  font-family: 'Vazirmatn', ui-sans-serif, system-ui, sans-serif !important;
+html,
+body,
+body *,
+input,
+button,
+select,
+textarea,
+table,
+th,
+td,
+label,
+legend,
+.fi-input,
+.fi-select,
+.fi-textarea,
+.fi-btn,
+.fi-ta-cell,
+.fi-ta-header-cell,
+.fi-section,
+.fi-sidebar-nav,
+[x-cloak],
+.x\:fi-ta-cell {
+  font-family: 'Vazirmatn FD', 'Vazirmatn', ui-sans-serif, system-ui, Tahoma, sans-serif !important;
+}
+
+/* ستون‌های کد، ایمیل و شماره سریال باید چپ‌به‌راست بمانند (فونت وزیرمتن حفظ می‌شود) */
+code,
+kbd,
+samp,
+pre,
+[dir='ltr'],
+input[type='email'],
+input[type='tel'],
+input[type='url'] {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: left;
 }

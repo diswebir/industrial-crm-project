@@ -1,12 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  AlertTriangle,
+  ArrowDownToLine,
+  ArrowUpFromLine,
   Boxes,
   CheckCircle2,
   Clock,
   Cpu,
   MessageSquare,
+  PackageCheck,
+  RefreshCcw,
   Send,
   ShieldCheck,
+  SlidersHorizontal,
   UserCheck,
   UserPlus,
   Users,
@@ -19,6 +25,16 @@ import { StatCard } from "../components/ui/StatCard";
 import { dashboardApi } from "../services/api";
 import { useAuthStore } from "../store/useAuthStore";
 import { cx, dateFa, num, relativeFa, weekdayFa } from "../utils/format";
+import { inventoryTypeMeta } from "../utils/meta";
+import type { Customer } from "../types";
+
+/** نام نمایشی مشتری — شخصیت حقوقی ممکن است نام شخص نداشته باشد (تسک ۵) */
+function nameOf(c?: Customer | null): string {
+  if (!c) return "—";
+  const person = `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim();
+  const company = (c.company_name ?? "").trim();
+  return c.full_name || person || company || "—";
+}
 
 export default function Dashboard() {
   const user = useAuthStore((s) => s.user);
@@ -33,9 +49,14 @@ export default function Dashboard() {
     total_customers: 0,
     effective_customers: 0,
     potential_customers: 0,
+    my_customers: 0,
     total_parts: 0,
     assigned_parts: 0,
+    assigned_quantity: 0,
+    total_stock: 0,
+    low_stock_count: 0,
     total_sms_sent: 0,
+    has_global_customer_access: true,
   };
 
   const today = new Date();
@@ -44,7 +65,7 @@ export default function Dashboard() {
     <div className="space-y-6">
       <PageHeader
         title={`سلام، ${user?.name || "کاربر گرامی"} 👋`}
-        subtitle={`${weekdayFa(today)}، ${dateFa(today)} — خلاصه وضعیت مدیریت قطعات و مشتریان`}
+        subtitle={`${weekdayFa(today)}، ${dateFa(today)} — خلاصه وضعیت مدیریت دستگاه‌ها، انبار و مشتریان`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Can permission="customers.create">
@@ -68,7 +89,7 @@ export default function Dashboard() {
       />
 
       {/* KPI Stats Grid - All linked to their respective pages */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         <StatCard
           title="کل مشتریان"
           value={num(stats.total_customers)}
@@ -83,7 +104,7 @@ export default function Dashboard() {
           value={num(stats.effective_customers)}
           icon={UserCheck}
           tone="success"
-          hint="دارای قطعه فیزیکی"
+          hint="دارای دستگاه تخصیص‌یافته"
           loading={isLoading}
           to="/customers?type=effective"
         />
@@ -96,23 +117,52 @@ export default function Dashboard() {
           loading={isLoading}
           to="/customers?type=potential"
         />
+        {!stats.has_global_customer_access && (
+          <StatCard
+            title="مشتریان من"
+            value={num(stats.my_customers)}
+            icon={ShieldCheck}
+            tone="secondary"
+            hint="مشتریانی که دسترسی مشاهده آن‌ها را دارید"
+            loading={isLoading}
+            to="/customers"
+          />
+        )}
         <StatCard
-          title="مدل‌های قطعات"
+          title="مدل‌های دستگاه"
           value={num(stats.total_parts)}
           icon={Cpu}
           tone="secondary"
-          hint="کاتالوگ محصولات"
+          hint="کاتالوگ دستگاه‌ها"
           loading={isLoading}
           to="/parts"
         />
         <StatCard
-          title="قطعات تخصیص‌یافته"
-          value={num(stats.assigned_parts)}
+          title="دستگاه‌های تخصیص‌یافته"
+          value={`${num(stats.assigned_quantity)} عدد`}
           icon={Boxes}
           tone="primary"
-          hint="دارای شماره سریال یکتا"
+          hint={`${num(stats.assigned_parts)} ردیف تخصیص با سریال یکتا`}
           loading={isLoading}
           to="/parts"
+        />
+        <StatCard
+          title="موجودی انبار"
+          value={`${num(stats.total_stock)} عدد`}
+          icon={PackageCheck}
+          tone="success"
+          hint="مجموع موجودی همه دستگاه‌ها"
+          loading={isLoading}
+          to="/inventory"
+        />
+        <StatCard
+          title="کمبود موجودی"
+          value={num(stats.low_stock_count)}
+          icon={AlertTriangle}
+          tone={stats.low_stock_count > 0 ? "error" : "success"}
+          hint="دستگاه‌های رسیده به حد هشدار"
+          loading={isLoading}
+          to="/inventory"
         />
         <StatCard
           title="پیامک‌های ارسالی"
@@ -184,11 +234,7 @@ export default function Dashboard() {
                       {act.description}
                     </p>
                     <div className="flex items-center gap-2 mt-1 text-xs text-base-content/50">
-                      <span>
-                        {act.customer
-                          ? `${act.customer.first_name} ${act.customer.last_name}`
-                          : "—"}
-                      </span>
+                      <span>{act.customer ? nameOf(act.customer) : "—"}</span>
                       <span>•</span>
                       <span>{relativeFa(act.created_at)}</span>
                     </div>
@@ -199,8 +245,91 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Right Column: Melipayamak Dispatched Logs & Quick Status */}
+        {/* Right Column: Inventory movements, Melipayamak Logs & Quick Status */}
         <div className="lg:col-span-5 space-y-6">
+          <Can permission="inventory.logs">
+            <div className="bg-base-100 rounded-2xl border border-base-200/80 p-5 shadow-xs">
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-base-200">
+                <div>
+                  <h3 className="font-bold text-base">آخرین تراکنش‌های انبار</h3>
+                  <p className="text-xs text-base-content/60">
+                    ورود، خروج و برگشت دستگاه‌ها با نام کاربر ثبت‌کننده
+                  </p>
+                </div>
+                <Link
+                  to="/inventory"
+                  className="text-xs font-semibold text-primary hover:underline"
+                >
+                  تاریخچه کامل انبار
+                </Link>
+              </div>
+
+              {!data?.recent_inventory?.length ? (
+                <div className="py-10 text-center text-sm text-base-content/50">
+                  هنوز تراکنش انباری ثبت نشده است.
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {data.recent_inventory.map((log) => {
+                    const meta = inventoryTypeMeta(log.type);
+                    return (
+                      <div
+                        key={log.id}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-800 dark:bg-slate-900/60"
+                      >
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <span
+                            className={cx(
+                              "flex size-8 shrink-0 items-center justify-center rounded-xl border",
+                              log.type === "in"
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                : log.type === "out"
+                                  ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                                  : "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300",
+                            )}
+                          >
+                            {log.type === "in" ? (
+                              <ArrowDownToLine className="size-4" />
+                            ) : log.type === "out" ? (
+                              <ArrowUpFromLine className="size-4" />
+                            ) : log.type === "return" ? (
+                              <RefreshCcw className="size-4" />
+                            ) : (
+                              <SlidersHorizontal className="size-4" />
+                            )}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate font-bold">{log.part?.name ?? "—"}</p>
+                            <p className="mt-0.5 truncate text-[11px] text-base-content/55">
+                              {meta.label} • {num(log.quantity)} عدد • توسط{" "}
+                              {log.user?.name ?? "سیستم"}
+                            </p>
+                            {log.customer_id ? (
+                              <Link
+                                to={`/customers/${log.customer_id}`}
+                                className="text-[11px] font-semibold text-primary hover:underline"
+                              >
+                                {nameOf(log.customer)}
+                              </Link>
+                            ) : null}
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-end">
+                          <p className="font-mono text-[11px] font-bold">
+                            موجودی: {num(log.stock_after)}
+                          </p>
+                          <p className="mt-0.5 text-[10px] text-base-content/40">
+                            {relativeFa(log.logged_at)}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </Can>
+
           <div className="bg-base-100 rounded-2xl border border-base-200/80 p-5 shadow-xs">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-base-200">
               <div>
@@ -239,10 +368,8 @@ export default function Dashboard() {
                           الگوی {sms.pattern_code}
                         </span>
                       </div>
-                      <p className="text-base-content/60 truncate max-w-[200px]">
-                        {sms.customer
-                          ? `${sms.customer.first_name} ${sms.customer.last_name}`
-                          : "ارسال مستقیم"}
+                      <p className="max-w-[200px] truncate text-base-content/60">
+                        {sms.customer ? nameOf(sms.customer) : "ارسال مستقیم"}
                       </p>
                     </div>
 
@@ -280,10 +407,11 @@ export default function Dashboard() {
               خط‌مشی گارانتی و سرویس دوره‌ای
             </h4>
             <p className="mt-2 text-xs text-indigo-900 leading-relaxed dark:text-indigo-300">
-              سرویس‌های دوره‌ای قطعات اجباری نبوده و به عنوان پوشش گارانتی
+              سرویس‌های دوره‌ای دستگاه‌ها اجباری نبوده و به عنوان پوشش گارانتی
               اختیاری شرکت برای مشتریان در نظر گرفته می‌شود. هر زمان مشتری
-              نیازمند تعمیر یا بررسی قطعه باشد، سابقه آن در پرونده قطعه با کد
-              رهگیری ثبت می‌گردد.
+              نیازمند تعمیر یا بررسی دستگاه باشد، سابقه آن در پرونده دستگاه با
+              کد رهگیری ثبت می‌گردد. موجودی انبار نیز با هر تخصیص به‌طور خودکار
+              کسر و در تاریخچه انبار ثبت می‌شود.
             </p>
           </div>
         </div>

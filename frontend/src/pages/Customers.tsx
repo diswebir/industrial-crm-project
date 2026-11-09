@@ -27,7 +27,7 @@ import { CustomerFormModal } from '../components/customers/CustomerFormModal'
 import { ImportModal } from '../components/customers/ImportModal'
 import { Can } from '../components/common/Can'
 import { customerApi } from '../services/api'
-import { cx, dateShort, num } from '../utils/format'
+import { customerLabel, cx, dateShort, num } from '../utils/format'
 import type { Customer, CustomerType } from '../types'
 
 const PAGE_SIZE = 10
@@ -103,13 +103,12 @@ export default function Customers() {
 
   const customers = data?.data ?? []
   const total = data?.total ?? 0
-  const pageCount = data?.last_page ?? 1
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="مدیریت مشتریان"
-        subtitle="فهرست مشتریان بالقوه و بالفعل، قطعات تخصیص‌یافته و پرونده مشتریان"
+        subtitle="فهرست مشتریان بالقوه و بالفعل، دستگاه‌های تخصیص‌یافته و پرونده کامل مشتریان"
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Can permission="customers.export">
@@ -171,7 +170,7 @@ export default function Customers() {
             }}
           >
             <UserCheck className="size-3.5 text-emerald-600" />
-            مشتریان بالفعل (خریدار قطعه)
+            مشتریان بالفعل (خریدار دستگاه)
           </button>
           <button
             role="tab"
@@ -230,7 +229,7 @@ export default function Customers() {
                   <th>وضعیت مشتری</th>
                   <th>اطلاعات تماس</th>
                   <th>شهر و استان</th>
-                  <th>قطعات تخصیص‌یافته</th>
+                  <th>دستگاه‌های تخصیص‌یافته</th>
                   <th>تاریخ ثبت</th>
                   <th className="text-end">عملیات</th>
                 </tr>
@@ -253,12 +252,20 @@ export default function Customers() {
                         <div>
                           <Link
                             to={`/customers/${c.id}`}
-                            className="font-bold text-sm text-base-content hover:text-primary transition-colors"
+                            className="text-sm font-bold text-base-content transition-colors hover:text-primary"
                           >
-                            {c.first_name} {c.last_name}
+                            {customerLabel(c)}
                           </Link>
-                          {c.company_name && (
-                            <p className="text-xs text-base-content/50 truncate max-w-[180px]">{c.company_name}</p>
+                          {c.type === 'company' && `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim() && (
+                            <p className="max-w-[180px] truncate text-xs text-base-content/50">
+                              {`${c.first_name} ${c.last_name}`.trim()}
+                            </p>
+                          )}
+                          {c.type !== 'company' && c.company_name && (
+                            <p className="max-w-[180px] truncate text-xs text-base-content/50">{c.company_name}</p>
+                          )}
+                          {c.created_by?.name && (
+                            <p className="text-[10px] text-base-content/40">ثبت‌کننده: {c.created_by.name}</p>
                           )}
                         </div>
                       </div>
@@ -277,8 +284,12 @@ export default function Customers() {
                     </td>
 
                     <td className="space-y-0.5 text-xs">
-                      <p className="font-mono font-medium ltr-text text-start">{c.mobile}</p>
-                      {c.phone && <p className="text-base-content/50 font-mono ltr-text text-start">{c.phone}</p>}
+                      {c.mobile ? (
+                        <p className="ltr-text text-start font-mono font-medium">{c.mobile}</p>
+                      ) : (
+                        <p className="text-[11px] text-base-content/35">شماره همراه ثبت نشده</p>
+                      )}
+                      {c.phone && <p className="ltr-text text-start font-mono text-base-content/50">{c.phone}</p>}
                     </td>
 
                     <td className="text-xs text-base-content/70">
@@ -291,7 +302,7 @@ export default function Customers() {
                         className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline"
                       >
                         <Cpu className="size-3.5" />
-                        {num(c.customer_parts_count ?? 0)} قطعه
+                        {num(c.customer_parts_count ?? 0)} دستگاه
                       </Link>
                     </td>
 
@@ -336,10 +347,10 @@ export default function Customers() {
           </div>
         )}
 
-        {/* Pagination Footer */}
-        {pageCount > 1 && (
-          <div className="border-t border-base-200 p-4">
-            <Pagination current={page} total={pageCount} onChange={setPage} />
+        {/* Pagination Footer — total = تعداد کل رکوردها (نه تعداد صفحات) */}
+        {total > 0 && (
+          <div className="border-t border-base-200">
+            <Pagination page={page} pageSize={data?.per_page ?? PAGE_SIZE} total={total} onPage={setPage} />
           </div>
         )}
       </div>
@@ -371,7 +382,7 @@ export default function Customers() {
         onClose={() => setDeleting(null)}
         onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
         title="حذف پرونده مشتری"
-        message={`آیا از حذف مشتری «${deleting?.first_name} ${deleting?.last_name}» اطمینان دارید؟ تمام سوابق و قطعات تخصیص یافته به این مشتری نیز حذف خواهند شد.`}
+        message={`آیا از حذف مشتری «${customerLabel(deleting)}» اطمینان دارید؟ تمام سوابق و دستگاه‌های تخصیص‌یافته به این مشتری نیز حذف می‌شوند و موجودی دستگاه‌ها به انبار بازمی‌گردد.`}
         confirmText="بله، حذف کن"
         tone="error"
         loading={deleteMutation.isPending}

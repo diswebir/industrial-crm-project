@@ -19,6 +19,8 @@ return new class extends Migration
         'parts.manage',
         'parts.assign',
         'parts.history',
+        'inventory.manage',
+        'inventory.logs',
         'sms.send',
         'sms.logs',
         'users.manage',

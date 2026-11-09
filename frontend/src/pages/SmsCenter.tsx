@@ -21,7 +21,7 @@ import { PageHeader } from '../components/ui/PageHeader'
 import { Field, TableSkeleton, EmptyState } from '../components/ui/Field'
 import { Can } from '../components/common/Can'
 import { smsApi, settingsApi } from '../services/api'
-import { cx, dateShort, dateTimeFa, num, relativeFa } from '../utils/format'
+import { customerLabel, cx, dateShort, dateTimeFa, num, relativeFa } from '../utils/format'
 
 const schema = z.object({
   mobile: z.string().regex(/^09\d{9}$/, 'شماره موبایل معتبر نیست (مثال: 09121234567)'),
@@ -276,7 +276,7 @@ export default function SmsCenter() {
                         <span className="font-mono font-bold text-xs ltr-text text-start block">{log.recipient_mobile}</span>
                         {log.customer && (
                           <span className="text-[10px] text-base-content/50 block">
-                            {log.customer.first_name} {log.customer.last_name}
+                            {customerLabel(log.customer)}
                           </span>
                         )}
                       </td>

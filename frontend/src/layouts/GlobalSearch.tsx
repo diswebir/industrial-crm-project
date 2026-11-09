@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Cpu, Search, User, X } from 'lucide-react'
 import { customerApi, partApi } from '../services/api'
 import { Avatar } from '../components/ui/Avatar'
+import { customerLabel } from '../utils/format'
 
 export function GlobalSearch() {
   const [q, setQ] = useState('')
@@ -65,7 +66,7 @@ export function GlobalSearch() {
           }}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 200)}
-          placeholder="جستجوی مشتریان یا قطعات..."
+          placeholder="جستجوی مشتریان یا دستگاه‌ها..."
           aria-label="جستجوی سراسری"
           className="grow text-xs"
         />
@@ -110,12 +111,14 @@ export function GlobalSearch() {
                     onClick={() => go(`/customers/${c.id}`)}
                     className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-start text-xs hover:bg-base-200 transition-colors"
                   >
-                    <Avatar name={`${c.first_name} ${c.last_name}`} size="sm" />
+                    <Avatar name={customerLabel(c)} size="sm" />
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-base-content truncate">
-                        {c.first_name} {c.last_name}
+                        {customerLabel(c)}
                       </p>
-                      <p className="text-[10px] text-base-content/50 font-mono ltr-text">{c.mobile}</p>
+                      <p className="text-[10px] text-base-content/50 font-mono ltr-text">
+                        {c.mobile || 'بدون شماره همراه'}
+                      </p>
                     </div>
                     <span className="badge badge-xs bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700">
                       {c.customer_type === 'effective' ? 'بالفعل' : 'بالقوه'}
@@ -129,7 +132,7 @@ export function GlobalSearch() {
           {parts.length > 0 && (
             <div>
               <p className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-bold text-base-content/50 uppercase">
-                <Cpu className="size-3.5 text-secondary" /> قطعات و کاتالوگ
+                <Cpu className="size-3.5 text-secondary" /> دستگاه‌ها و کاتالوگ
               </p>
               <div className="space-y-0.5">
                 {parts.map((p) => (

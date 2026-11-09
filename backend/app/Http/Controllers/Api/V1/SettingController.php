@@ -71,6 +71,8 @@ class SettingController extends Controller
         return response()->json([
             'company_name' => $companyName ?: null,
             'company_logo_url' => $companyLogoUrl,
+            'app_version' => config('crm.version'),
+            'app_version_name' => config('crm.version_name'),
         ]);
     }
 
@@ -123,12 +125,5 @@ class SettingController extends Controller
         ]);
     }
 
-    protected function authorizePermission(string $permission): void
-    {
-        $user = auth()->user();
-        if (!$user || !$user->hasPermissionTo($permission)) {
-            abort(403, "شما دسترسی لازم ({$permission}) برای این عملیات را ندارید.");
-        }
-    }
 }
 

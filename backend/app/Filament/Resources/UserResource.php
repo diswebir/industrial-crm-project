@@ -50,13 +50,39 @@ class UserResource extends Resource
                     ->required(fn (string $operation): bool => $operation === 'create')
                     ->maxLength(255),
                 Forms\Components\Select::make('user_type')
-                    ->label('نوع کاربر')
+                    ->label('نقش سازمانی')
                     ->options([
-                        'administrator' => 'مدیر ارشد (Administrator)',
-                        'manager' => 'مدیر (Manager)',
+                        'administrator' => 'مدیر ارشد سامانه (Administrator)',
+                        'manager' => 'مدیر / سرپرست (Manager)',
+                        'salesperson' => 'کارمند فروش (Salesperson)',
+                        'installer' => 'نصاب (Installer)',
                     ])
                     ->default('manager')
                     ->required(),
+                Forms\Components\Select::make('customers_scope')
+                    ->label('دامنه دسترسی به مشتریان')
+                    ->options([
+                        'all' => 'همه مشتریان سامانه',
+                        'own' => 'فقط مشتریان خودش + استثناهای اعطاشده',
+                    ])
+                    ->default('all')
+                    ->required()
+                    ->helperText('برای نقش «کارمند فروش» و «نصاب» مقدار پیش‌فرض «فقط مشتریان خودش» است.'),
+                Forms\Components\Select::make('accessibleStaff')
+                    ->label('دسترسی به مشتریانِ کارمندان مشخص')
+                    ->relationship('accessibleStaff', 'name')
+                    ->multiple()
+                    ->searchable()
+                    ->preload()
+                    ->visible(fn (Forms\Get $get): bool => $get('customers_scope') === 'own'),
+                Forms\Components\Select::make('accessibleCustomers')
+                    ->label('دسترسی به مشتریان تکی (استثنا)')
+                    ->relationship('accessibleCustomers', 'company_name')
+                    ->getOptionLabelFromRecordUsing(fn (\App\Models\Customer $record): string => $record->full_name . ($record->mobile ? ' — ' . $record->mobile : ''))
+                    ->multiple()
+                    ->searchable()
+                    ->preload()
+                    ->visible(fn (Forms\Get $get): bool => $get('customers_scope') === 'own'),
                 Forms\Components\Toggle::make('is_active')
                     ->label('حساب کاربری فعال است')
                     ->default(true)
@@ -84,14 +110,20 @@ class UserResource extends Resource
                     ->label('شماره موبایل')
                     ->searchable(),
                 Tables\Columns\BadgeColumn::make('user_type')
-                    ->label('نوع کاربر')
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'administrator' => 'مدیر ارشد',
-                        default => 'مدیر',
-                    })
+                    ->label('نقش سازمانی')
+                    ->formatStateUsing(fn (?string $state): string => config("acl.roles.{$state}.label", $state ?? 'مدیر'))
                     ->colors([
                         'warning' => 'administrator',
                         'secondary' => 'manager',
+                        'info' => 'salesperson',
+                        'success' => 'installer',
+                    ]),
+                Tables\Columns\BadgeColumn::make('customers_scope')
+                    ->label('دامنه دسترسی')
+                    ->formatStateUsing(fn (?string $state): string => $state === 'own' ? 'فقط مشتریان خودش' : 'همه مشتریان')
+                    ->colors([
+                        'gray' => 'all',
+                        'info' => 'own',
                     ]),
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('فعال')

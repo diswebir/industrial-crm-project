@@ -6,6 +6,10 @@ export interface SelectOption {
   value: string
   label: string
   hint?: string
+  /** گزینه غیرقابل انتخاب (مثلاً دستگاه بدون موجودی انبار) */
+  disabled?: boolean
+  /** برچسب کوتاه سمت چپ گزینه (مثلاً «ناموجود») */
+  badge?: string
 }
 
 interface SearchableSelectProps {
@@ -153,7 +157,7 @@ export function SearchableSelect({
 
         {/* Dropdown Menu */}
         {open && (
-          <div className="absolute top-full z-50 mt-1 w-full rounded-2xl border border-base-300 bg-base-100 p-2 shadow-xl animate-in fade-in zoom-in-95 duration-100">
+          <div className="absolute top-full z-[60] mt-1 w-full rounded-2xl border border-base-300 bg-base-100 p-2 shadow-xl animate-in fade-in zoom-in-95 duration-100">
             {/* Search Input */}
             <div className="relative mb-2">
               <Search className="absolute right-3 top-2.5 size-4 text-base-content/40" />
@@ -183,24 +187,28 @@ export function SearchableSelect({
               ) : (
                 filteredOptions.map((opt) => {
                   const isSelected = opt.value === value
+                  const isOff = Boolean(opt.disabled)
                   return (
                     <button
                       key={opt.value}
                       type="button"
-                      onClick={() => handleSelect(opt.value)}
+                      disabled={isOff}
+                      onClick={() => !isOff && handleSelect(opt.value)}
+                      title={isOff ? 'این گزینه قابل انتخاب نیست' : undefined}
                       className={cx(
                         'flex w-full items-center justify-between rounded-xl px-3 py-2 text-start text-xs transition-colors',
+                        isOff && 'cursor-not-allowed opacity-45',
                         isSelected
-                          ? 'bg-primary text-primary-content font-bold'
-                          : 'hover:bg-base-200 text-base-content',
+                          ? 'bg-primary font-bold text-primary-content'
+                          : 'text-base-content hover:bg-base-200',
                       )}
                     >
-                      <div className="flex flex-col min-w-0">
+                      <div className="flex min-w-0 flex-col">
                         <span className="truncate">{opt.label}</span>
                         {opt.hint && (
                           <span
                             className={cx(
-                              'text-[10px] truncate',
+                              'truncate text-[10px]',
                               isSelected ? 'text-primary-content/80' : 'text-base-content/50',
                             )}
                           >
@@ -208,7 +216,12 @@ export function SearchableSelect({
                           </span>
                         )}
                       </div>
-                      {isSelected && <Check className="size-4 shrink-0 ms-2" />}
+                      <div className="flex shrink-0 items-center gap-1.5 ms-2">
+                        {opt.badge && (
+                          <span className="badge badge-ghost badge-xs font-normal">{opt.badge}</span>
+                        )}
+                        {isSelected && <Check className="size-4" />}
+                      </div>
                     </button>
                   )
                 })

@@ -107,21 +107,11 @@ class AuthController extends Controller
         }
 
         $token = $user->createToken('api-token')->plainTextToken;
-        $permissions = $user->getAllPermissions()->pluck('name')->values()->all();
         $cookie = $this->createAuthCookie($token);
 
         return response()->json([
             'message' => 'ورود با موفقیت انجام شد.',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'avatar' => $user->avatar,
-                'avatar_url' => $user->avatar_url,
-                'permissions' => $permissions,
-                'user_type' => $user->user_type,
-            ],
+            'user' => $this->userPayload($user),
             'token' => $token,
         ])->withCookie($cookie);
     }
@@ -153,20 +143,10 @@ class AuthController extends Controller
         }
 
         $token = $user->createToken('api-token')->plainTextToken;
-        $permissions = $user->getAllPermissions()->pluck('name')->values()->all();
         $cookie = $this->createAuthCookie($token);
 
         return response()->json([
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'avatar' => $user->avatar,
-                'avatar_url' => $user->avatar_url,
-                'permissions' => $permissions,
-                'user_type' => $user->user_type,
-            ],
+            'user' => $this->userPayload($user),
             'token' => $token,
         ])->withCookie($cookie);
     }
@@ -177,19 +157,9 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         $user = $request->user();
-        $permissions = $user->getAllPermissions()->pluck('name')->values()->all();
 
         return response()->json([
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'avatar' => $user->avatar,
-                'avatar_url' => $user->avatar_url,
-                'permissions' => $permissions,
-                'user_type' => $user->user_type,
-            ],
+            'user' => $this->userPayload($user),
         ]);
     }
 
@@ -238,20 +208,10 @@ class AuthController extends Controller
 
         $user->save();
 
-        $permissions = $user->getAllPermissions()->pluck('name')->values()->all();
 
         return response()->json([
             'message' => 'پروفایل شما با موفقیت بروزرسانی شد.',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'avatar' => $user->avatar,
-                'avatar_url' => $user->avatar_url,
-                'permissions' => $permissions,
-                'user_type' => $user->user_type,
-            ],
+            'user' => $this->userPayload($user),
         ]);
     }
 
@@ -266,6 +226,28 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'خروج با موفقیت انجام شد.',
         ])->withCookie($cookie);
+    }
+
+    /**
+     * ساختار یکسان پاسخ کاربر (شامل نقش سازمانی و دامنه دسترسی به مشتریان).
+     *
+     * @return array<string, mixed>
+     */
+    protected function userPayload(User $user): array
+    {
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'phone' => $user->phone,
+            'avatar' => $user->avatar,
+            'avatar_url' => $user->avatar_url,
+            'permissions' => $user->getAllPermissions()->pluck('name')->values()->all(),
+            'user_type' => $user->roleKey(),
+            'role_label' => $user->role_label,
+            'customers_scope' => $user->customers_scope ?: 'all',
+            'has_global_customer_access' => $user->hasGlobalCustomerAccess(),
+        ];
     }
 
     /**

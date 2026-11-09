@@ -1,19 +1,20 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
-import { ArrowRight, Check, KeyRound, Save, ShieldCheck, UserPlus } from 'lucide-react'
+import { ArrowRight, KeyRound, Save, UserPlus } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Field } from '../../components/ui/Field'
 import { FilePondAvatar } from '../../components/ui/FilePondAvatar'
 import { PasswordRulesTooltip } from '../../components/ui/PasswordRulesTooltip'
 import AccessDenied from '../AccessDenied'
-import { usersApi } from '../../services/api'
+import { RoleAccessFields, type RoleAccessValue } from '../../components/settings/RoleAccessFields'
+import { apiErrorMessage, usersApi } from '../../services/api'
 import { useAuthStore } from '../../store/useAuthStore'
-import { cx, toEnDigits } from '../../utils/format'
+import { cx, num, toEnDigits } from '../../utils/format'
 
 const schema = z.object({
   name: z.string().trim().min(2, 'نام و نام خانوادگی را حداقل در ۲ کاراکتر وارد کنید'),
@@ -36,7 +37,6 @@ const schema = z.object({
     .min(8, 'کلمه عبور باید حداقل ۸ کاراکتر باشد')
     .regex(/^(?=.*[a-zA-Z])(?=.*\d)/, 'کلمه عبور باید شامل حروف انگلیسی و اعداد باشد'),
   is_active: z.boolean(),
-  user_type: z.enum(['administrator', 'manager']),
 })
 
 type CreateUserFormValues = z.infer<typeof schema>
@@ -49,6 +49,13 @@ export default function CreateUserPage() {
 
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [selectedPerms, setSelectedPerms] = useState<string[]>([])
+  /** نقش سازمانی + دامنه دسترسی به مشتریان + استثنائهای اعطاشده (تسک ۱) */
+  const [roleAccess, setRoleAccess] = useState<RoleAccessValue>({
+    user_type: 'manager',
+    customers_scope: 'all',
+    accessible_staff_ids: [],
+    accessible_customer_ids: [],
+  })
 
   const { data: availablePermissions = [] } = useQuery({
     queryKey: ['available-permissions'],
@@ -70,9 +77,18 @@ export default function CreateUserPage() {
       phone: '',
       password: '',
       is_active: true,
-      user_type: 'manager',
     },
   })
+
+  /** گروه‌بندی مجوزها بر اساس بخش (مشتریان، دستگاه‌ها، انبار، پیامک، سیستم) */
+  const permissionGroups = useMemo(() => {
+    const map = new Map<string, typeof availablePermissions>()
+    availablePermissions.forEach((perm) => {
+      const key = perm.group || 'سایر'
+      map.set(key, [...(map.get(key) ?? []), perm])
+    })
+    return [...map.entries()]
+  }, [availablePermissions])
 
   const togglePerm = (permName: string) => {
     setSelectedPerms((prev) =>
@@ -96,8 +112,7 @@ export default function CreateUserPage() {
       nav('/settings/users')
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'خطا در ایجاد کاربر'
-      toast.error(msg)
+      toast.error(apiErrorMessage(err, 'خطا در ایجاد کاربر'))
     },
   })
 
@@ -110,7 +125,17 @@ export default function CreateUserPage() {
     }
     formData.append('password', values.password)
     formData.append('is_active', values.is_active ? '1' : '0')
-    formData.append('user_type', values.user_type)
+    formData.append('user_type', roleAccess.user_type)
+    formData.append('customers_scope', roleAccess.customers_scope)
+
+    // استثناهای دسترسی فقط در دامنه «فقط مشتریان خودش» معنا دارد
+    if (roleAccess.customers_scope === 'own') {
+      roleAccess.accessible_staff_ids.forEach((sid) => formData.append('accessible_staff_ids[]', String(sid)))
+      roleAccess.accessible_customer_ids.forEach((cid) => formData.append('accessible_customer_ids[]', String(cid)))
+    } else {
+      formData.append('accessible_staff_ids', '')
+      formData.append('accessible_customer_ids', '')
+    }
 
     if (avatarFile) {
       formData.append('avatar', avatarFile)
@@ -139,7 +164,7 @@ export default function CreateUserPage() {
 
       <PageHeader
         title="تعریف کاربر جدید"
-        subtitle="ایجاد حساب کاربری با تعیین مشخصات، آپلود تصویر آواتار و اعطای مستقیم مجوزها (Pure ACL)"
+        subtitle="ایجاد حساب کاربری با تعیین نقش سازمانی، دامنه دسترسی به مشتریان، آپلود آواتار و اعطای مستقیم مجوزها (Pure ACL)"
       />
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -217,61 +242,22 @@ export default function CreateUserPage() {
             </Field>
           </div>
 
-          {/* User Type Selection */}
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
-            <div>
-              <p className="font-bold text-xs text-base-content">نوع کاربری (نقش سیستمی)</p>
-              <p className="text-[11px] text-base-content/60 mt-0.5">
-                {isAdministrator
-                  ? 'تعیین سطح کاربری: مدیر ارشد یا مدیر عادی سامانه'
-                  : 'کاربران ایجاد شده توسط شما با سطح دسترسی «مدیر» تعریف می‌شوند.'}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-              <label
-                className={cx(
-                  'flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition-all',
-                  watch('user_type') === 'manager'
-                    ? 'border-primary bg-primary/5 text-primary shadow-xs'
-                    : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/40',
-                )}
-              >
-                <input
-                  type="radio"
-                  value="manager"
-                  className="radio radio-primary radio-sm"
-                  {...register('user_type')}
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-xs text-base-content">مدیر (Manager)</p>
-                  <p className="text-[11px] text-base-content/60">کاربر عملیاتی با مجوزهای تعیین‌شده</p>
-                </div>
-              </label>
-
-              {isAdministrator && (
-                <label
-                  className={cx(
-                    'flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition-all',
-                    watch('user_type') === 'administrator'
-                      ? 'border-amber-500 bg-amber-50/50 text-amber-900 shadow-xs dark:bg-amber-950/20 dark:text-amber-300'
-                      : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/40',
-                  )}
-                >
-                  <input
-                    type="radio"
-                    value="administrator"
-                    className="radio radio-warning radio-sm"
-                    {...register('user_type')}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-xs text-base-content">مدیر ارشد (Administrator)</p>
-                    <p className="text-[11px] text-base-content/60">دسترسی به تمامی تنظیمات، برندینگ و رنگ</p>
-                  </div>
-                </label>
-              )}
-            </div>
-          </div>
+          {/* نقش سازمانی + دامنه دسترسی به مشتریان + استثنائهای اعطاشده (تسک ۱) */}
+          <RoleAccessFields
+            value={roleAccess}
+            onChange={setRoleAccess}
+            isAdministrator={isAdministrator}
+            onApplyRoleDefaults={(perms) => {
+              const allowed = new Set(availablePermissions.map((p) => p.name))
+              const applicable = perms.filter((perm) => allowed.has(perm))
+              setSelectedPerms(applicable)
+              toast.success(
+                applicable.length
+                  ? `${num(applicable.length)} مجوز پیش‌فرض نقش اعمال شد.`
+                  : 'هیچ مجوز پیش‌فرضی برای این نقش در دسترس شما نیست.',
+              )
+            }}
+          />
 
           {/* Active status */}
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
@@ -299,7 +285,7 @@ export default function CreateUserPage() {
               <div>
                 <h3 className="text-base font-bold text-base-content">تخصیص مجوزهای دسترسی (Pure ACL)</h3>
                 <p className="text-xs text-base-content/60">
-                  {selectedPerms.length} دسترسی از {availablePermissions.length} مجاز انتخاب شده است
+                  {num(selectedPerms.length)} دسترسی از {num(availablePermissions.length)} مجاز انتخاب شده است
                 </p>
                 {!isAdministrator && (
                   <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-1">
@@ -327,34 +313,39 @@ export default function CreateUserPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {availablePermissions.map((perm) => {
-              const checked = selectedPerms.includes(perm.name)
-              return (
-                <label
-                  key={perm.name}
-                  onClick={() => togglePerm(perm.name)}
-                  className={cx(
-                    'flex items-start gap-3 rounded-2xl border p-3.5 cursor-pointer transition-all',
-                    checked
-                      ? 'border-primary bg-primary/5 text-primary shadow-xs'
-                      : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/40',
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    className="checkbox checkbox-primary checkbox-sm mt-0.5"
-                    checked={checked}
-                    onChange={() => {}}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-xs text-base-content">{perm.label}</p>
-                    <p className="font-mono text-[10px] text-base-content/50 mt-0.5">{perm.name}</p>
-                  </div>
-                </label>
-              )
-            })}
-          </div>
+          {permissionGroups.map(([group, perms]) => (
+            <div key={group} className="space-y-2">
+              <p className="text-[11px] font-black text-base-content/60">{group}</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {perms.map((perm) => {
+                  const checked = selectedPerms.includes(perm.name)
+                  return (
+                    <label
+                      key={perm.name}
+                      onClick={() => togglePerm(perm.name)}
+                      className={cx(
+                        'flex cursor-pointer items-start gap-3 rounded-2xl border p-3.5 transition-all',
+                        checked
+                          ? 'border-primary bg-primary/5 text-primary shadow-xs'
+                          : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/40',
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-primary checkbox-sm mt-0.5"
+                        checked={checked}
+                        onChange={() => {}}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-base-content">{perm.label}</p>
+                        <p className="mt-0.5 font-mono text-[10px] text-base-content/50">{perm.name}</p>
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* Action Buttons */}

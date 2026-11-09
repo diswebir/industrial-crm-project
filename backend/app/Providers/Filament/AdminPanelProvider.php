@@ -27,14 +27,18 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
-            ->brandName('مدیریت قطعات صنعتی')
+            ->brandName('مدیریت دستگاه‌های صنعتی')
             ->colors([
                 'primary' => Color::Amber,
             ])
-            ->font('Vazirmatn', url: '/css/vazirmatn.css')
+            // وزیرمتن با ارقام فارسی (Vazirmatn FD) — همه اعداد در پنل مدیریت فارسی نمایش داده می‌شوند
+            ->font('Vazirmatn FD', url: '/css/vazirmatn.css')
             ->renderHook(
                 'panels::head.done',
-                fn () => new \Illuminate\Support\HtmlString('<link rel="stylesheet" href="/css/vazirmatn.css">')
+                fn () => new \Illuminate\Support\HtmlString(
+                    '<link rel="stylesheet" href="/css/vazirmatn.css">'
+                    . '<link rel="preload" as="font" type="font/woff2" href="/fonts/vazirmatn-fd-Regular.woff2" crossorigin>'
+                )
             )
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')

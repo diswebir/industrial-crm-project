@@ -77,8 +77,61 @@
   --noise: 0;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   فونت وزیرمتن با ارقام فارسی (Vazirmatn FD) — تسک ۹
+   در این نسخه، گلیف ارقام لاتین (0-9) با ارقام فارسی (۰-۹) جایگزین شده است،
+   بنابراین «مقدار» ذخیره‌شده در اینپوت‌ها و دیتابیس همان ASCII می‌ماند ولی
+   «نمایش» همه اعداد در کل سامانه فارسی است.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('./assets/fonts/vazirmatn-fd/Vazirmatn-FD-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('./assets/fonts/vazirmatn-fd/Vazirmatn-FD-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('./assets/fonts/vazirmatn-fd/Vazirmatn-FD-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('./assets/fonts/vazirmatn-fd/Vazirmatn-FD-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('./assets/fonts/vazirmatn-fd/Vazirmatn-FD-ExtraBold.woff2') format('woff2');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn FD';
+  src: url('./assets/fonts/vazirmatn-fd/Vazirmatn-FD-Black.woff2') format('woff2');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
-  --font-sans: "Vazirmatn Variable", "Vazirmatn", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Vazirmatn FD", "Vazirmatn Variable", "Vazirmatn", ui-sans-serif, system-ui, sans-serif;
+  /* اعداد سریال، موبایل و مبالغ هم باید با وزیرمتن و ارقام فارسی نمایش داده شوند */
+  --font-mono: "Vazirmatn FD", "Vazirmatn Variable", "Vazirmatn", ui-monospace, "Courier New", monospace;
+  --default-font-family: "Vazirmatn FD", "Vazirmatn Variable", "Vazirmatn", ui-sans-serif, system-ui, sans-serif;
+  --default-mono-font-family: "Vazirmatn FD", "Vazirmatn Variable", "Vazirmatn", ui-monospace, monospace;
 }
 
 @layer base {
@@ -90,6 +143,14 @@
   body {
     background-color: var(--color-base-200);
     min-height: 100dvh;
+  }
+  /* اطمینان از یکدست بودن فونت در همه المان‌های فرم و جدول (تسک ۹) */
+  body, input, button, select, textarea, table, th, td, label, legend,
+  option, optgroup, summary, details, dialog, .btn, .input, .select, .textarea, .badge, .tab {
+    font-family: var(--font-sans);
+  }
+  code, kbd, samp, pre, .font-mono {
+    font-family: var(--font-mono);
   }
   /* Phone numbers, emails, SKUs etc. stay left-to-right inside RTL text */
   .ltr-text {
@@ -119,6 +180,38 @@
     color: transparent;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   تقویم شمسی — تسک ۷
+   پاپ‌آپ تقویم با Portal مستقیماً زیر document.body رندر می‌شود، بنابراین
+   هیچ کانتینری با overflow:hidden / overflow-x:auto آن را نمی‌بُرد و
+   z-index آن همیشه بالای هدر جدول، مودال و سایر لایه‌ها است.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.jalali-picker-portal {
+  position: fixed;
+  z-index: 2147483000;
+  isolation: isolate;
+}
+.jalali-picker-panel {
+  width: 18rem;
+  max-width: calc(100vw - 1.5rem);
+  max-height: calc(100dvh - 1.5rem);
+  overflow-y: auto;
+  border-radius: 1rem;
+  border: 1px solid var(--color-base-300);
+  background-color: var(--color-base-100);
+  color: var(--color-base-content);
+  padding: 0.75rem;
+  box-shadow: 0 24px 60px -12px rgb(0 0 0 / 0.35);
+  font-family: var(--font-sans);
+  animation: jalali-picker-in 140ms ease-out;
+}
+@keyframes jalali-picker-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* مودال‌ها نباید پاپ‌آپ تقویم را ببُرند؛ اسکرول عمودی بدنه مودال حفظ می‌شود */
+.modal-box { overflow-x: hidden; }
 
 /* Recharts: keep tooltips/labels in Persian font */
 .recharts-text, .recharts-legend-item-text { font-family: var(--font-sans); }
@@ -197,5 +290,5 @@ html[data-color="red"] {
 }
 html[data-theme="nikan-dark"][data-color="red"] {
   --color-primary: oklch(66% 0.21 25);
-  --color-primary-content: oklch(15% 0.04 25);
+  --color-primary-content: oklch(15% 0.05 25);
 }

@@ -102,8 +102,47 @@ export function relativeFa(iso: string | Date | null | undefined, now = Date.now
   return `${num(Math.floor(mo / 12))} سال ${suffix}`
 }
 
-export const fullName = (c: { firstName?: string; lastName?: string; first_name?: string; last_name?: string }) =>
-  c.first_name ? `${c.first_name} ${c.last_name || ''}`.trim() : `${c.firstName || ''} ${c.lastName || ''}`.trim()
+/**
+ * نام نمایشی مشتری — برای شخصیت حقوقی ممکن است نام/نام خانوادگی ثبت نشده باشد،
+ * در آن صورت نام شرکت برگردانده می‌شود (تسک ۵).
+ */
+export const fullName = (c: {
+  firstName?: string | null
+  lastName?: string | null
+  first_name?: string | null
+  last_name?: string | null
+  company_name?: string | null
+  company?: string | null
+  full_name?: string | null
+}): string => {
+  if (!c) return ''
+  if (c.full_name && c.full_name.trim()) return c.full_name.trim()
+  const person = `${c.first_name ?? c.firstName ?? ''} ${c.last_name ?? c.lastName ?? ''}`.trim()
+  const company = (c.company_name ?? c.company ?? '').trim()
+  return person || company
+}
+
+/**
+ * عنوان نمایشی مشتری با در نظر گرفتن «شخصیت» (حقیقی/حقوقی) — تسک ۵.
+ * برای مشتری حقوقی، نام شرکت در اولویت است؛ برای حقیقی، نام و نام خانوادگی.
+ */
+export function customerLabel(
+  c?: {
+    type?: string | null
+    first_name?: string | null
+    last_name?: string | null
+    company_name?: string | null
+    full_name?: string | null
+  } | null,
+  fallback = '—',
+): string {
+  if (!c) return fallback
+  const person = `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim()
+  const company = (c.company_name ?? '').trim()
+  const full = (c.full_name ?? '').trim()
+  if (c.type === 'company') return company || full || person || fallback
+  return person || full || company || fallback
+}
 
 /** Stable pseudo-random hue from a string, used for avatar colours. */
 export function hueFrom(str: string): number {

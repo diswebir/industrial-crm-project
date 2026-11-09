@@ -59,6 +59,12 @@ class BuildTest(unittest.TestCase):
             (self.root/'backend'/name).write_text('{}')
         for name in ['index.php', 'private-path.php', 'resolve-private.php']:
             (self.root/'backend/public'/name).write_text('<?php // fixture')
+        # Custom public assets that Composer never publishes (Persian Vazirmatn FD font).
+        (self.root/'backend/public/css').mkdir(parents=True, exist_ok=True)
+        (self.root/'backend/public/css/vazirmatn.css').write_text("/* font-family: 'Vazirmatn FD' */")
+        (self.root/'backend/public/fonts').mkdir(parents=True, exist_ok=True)
+        for weight in ['Regular', 'Medium', 'SemiBold', 'Bold', 'Black']:
+            (self.root/f'backend/public/fonts/vazirmatn-fd-{weight}.woff2').write_bytes(b'wOF2 fixture')
         for name in ['src', 'public']:
             (self.root/'frontend'/name).mkdir(parents=True)
         for name in ['index.html', 'package.json', 'package-lock.json', 'tsconfig.json', 'tsconfig.app.json', 'tsconfig.node.json', 'vite.config.ts', 'src/main.ts']:
@@ -100,8 +106,12 @@ class BuildTest(unittest.TestCase):
             self.assertNotIn('bootstrap/cache/packages.php', z.namelist())
             self.assertNotIn('database/database.sqlite', z.namelist())
         with zipfile.ZipFile(self.out/'cpanel-public.zip') as z:
-            self.assertIn('index.html', z.namelist())
-            self.assertNotIn('storage/customer.txt', z.namelist())
+            names = z.namelist()
+            self.assertIn('index.html', names)
+            self.assertNotIn('storage/customer.txt', names)
+            # Custom font/CSS assets must survive packaging (admin panel Persian font + digits).
+            self.assertIn('css/vazirmatn.css', names)
+            self.assertIn('fonts/vazirmatn-fd-Regular.woff2', names)
         check=subprocess.run(['sha256sum', '-c', 'SHA256SUMS'], cwd=self.out, capture_output=True)
         self.assertEqual(check.returncode, 0)
         self.assert_clean()

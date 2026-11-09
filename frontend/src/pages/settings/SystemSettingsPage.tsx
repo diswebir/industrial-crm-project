@@ -125,6 +125,17 @@ export default function SystemSettingsPage() {
             ? 'مدیریت مشخصات شرکت، پالت رنگی اصلی و حالت روز/شب (Light/Dark) سامانه'
             : 'شخصی‌سازی حالت روز یا شب (Light/Dark) سامانه متناسب با نور محیط کار'
         }
+        actions={
+          companySettings?.app_version ? (
+            <span
+              dir="ltr"
+              className="badge badge-outline badge-sm gap-1 font-mono text-[11px] text-base-content/70"
+              title="نسخه جاری سامانه"
+            >
+              CRM {companySettings.app_version_name || `v${companySettings.app_version}`}
+            </span>
+          ) : undefined
+        }
       />
 
       {/* Company Branding - Admins Only */}

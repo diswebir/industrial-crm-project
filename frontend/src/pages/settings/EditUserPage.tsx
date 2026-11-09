@@ -1,20 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
-import { ArrowRight, Check, KeyRound, Pencil, Save, ShieldCheck, Trash2 } from 'lucide-react'
+import { ArrowRight, KeyRound, Pencil, Save, Trash2 } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Field, PageSkeleton } from '../../components/ui/Field'
 import { FilePondAvatar } from '../../components/ui/FilePondAvatar'
 import { ConfirmDialog } from '../../components/ui/Modal'
 import { PasswordRulesTooltip } from '../../components/ui/PasswordRulesTooltip'
 import AccessDenied from '../AccessDenied'
-import { usersApi } from '../../services/api'
+import { RoleAccessFields, type RoleAccessValue } from '../../components/settings/RoleAccessFields'
+import { apiErrorMessage, usersApi } from '../../services/api'
 import { useAuthStore } from '../../store/useAuthStore'
-import { cx, toEnDigits } from '../../utils/format'
+import { cx, num, toEnDigits } from '../../utils/format'
 
 const schema = z.object({
   name: z.string().trim().min(2, 'نام و نام خانوادگی را حداقل در ۲ کاراکتر وارد کنید'),
@@ -52,7 +53,6 @@ const schema = z.object({
       }
     }),
   is_active: z.boolean(),
-  user_type: z.enum(['administrator', 'manager']).optional(),
 })
 
 type EditUserFormValues = z.infer<typeof schema>
@@ -69,6 +69,13 @@ export default function EditUserPage() {
   const [removeAvatar, setRemoveAvatar] = useState(false)
   const [selectedPerms, setSelectedPerms] = useState<string[]>([])
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  /** نقش سازمانی + دامنه دسترسی به مشتریان + استثنائهای اعطاشده (تسک ۱) */
+  const [roleAccess, setRoleAccess] = useState<RoleAccessValue>({
+    user_type: 'manager',
+    customers_scope: 'all',
+    accessible_staff_ids: [],
+    accessible_customer_ids: [],
+  })
 
   const isCurrent = currentUser?.id === String(id)
 
@@ -99,7 +106,6 @@ export default function EditUserPage() {
       phone: '',
       password: '',
       is_active: true,
-      user_type: 'manager',
     },
   })
 
@@ -111,11 +117,26 @@ export default function EditUserPage() {
         phone: user.phone || '',
         password: '',
         is_active: user.is_active ?? true,
-        user_type: user.user_type || 'manager',
       })
       setSelectedPerms(user.permissions || [])
+      setRoleAccess({
+        user_type: user.user_type || 'manager',
+        customers_scope: user.customers_scope || (user.has_global_customer_access ? 'all' : 'own'),
+        accessible_staff_ids: (user.accessible_staff_ids ?? []).map(Number),
+        accessible_customer_ids: (user.accessible_customer_ids ?? []).map(Number),
+      })
     }
   }, [user, reset])
+
+  /** گروه‌بندی مجوزها بر اساس بخش (مشتریان، دستگاه‌ها، انبار، پیامک، سیستم) */
+  const permissionGroups = useMemo(() => {
+    const map = new Map<string, typeof availablePermissions>()
+    availablePermissions.forEach((perm) => {
+      const key = perm.group || 'سایر'
+      map.set(key, [...(map.get(key) ?? []), perm])
+    })
+    return [...map.entries()]
+  }, [availablePermissions])
 
   const togglePerm = (permName: string) => {
     setSelectedPerms((prev) =>
@@ -143,8 +164,7 @@ export default function EditUserPage() {
       nav('/settings/users')
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || 'خطا در ذخیره تغییرات کاربر'
-      toast.error(msg)
+      toast.error(apiErrorMessage(err, 'خطا در ذخیره تغییرات کاربر'))
     },
   })
 
@@ -156,7 +176,7 @@ export default function EditUserPage() {
       nav('/settings/users')
     },
     onError: (err: any) => {
-      toast.error(err.response?.data?.message || 'خطا در حذف کاربر')
+      toast.error(apiErrorMessage(err, 'خطا در حذف کاربر'))
     },
   })
 
@@ -170,8 +190,16 @@ export default function EditUserPage() {
       formData.append('password', values.password.trim())
     }
     formData.append('is_active', values.is_active ? '1' : '0')
-    if (values.user_type) {
-      formData.append('user_type', values.user_type)
+    formData.append('user_type', roleAccess.user_type)
+    formData.append('customers_scope', roleAccess.customers_scope)
+
+    // استثناهای دسترسی فقط در دامنه «فقط مشتریان خودش» معنا دارد
+    if (roleAccess.customers_scope === 'own') {
+      roleAccess.accessible_staff_ids.forEach((sid) => formData.append('accessible_staff_ids[]', String(sid)))
+      roleAccess.accessible_customer_ids.forEach((cid) => formData.append('accessible_customer_ids[]', String(cid)))
+    } else {
+      formData.append('accessible_staff_ids', '')
+      formData.append('accessible_customer_ids', '')
     }
 
     if (avatarFile) {
@@ -230,7 +258,7 @@ export default function EditUserPage() {
 
       <PageHeader
         title={`ویرایش مشخصات کاربر: ${user.name}`}
-        subtitle="ویرایش اطلاعات هویتی، آواتار و تنظیم مستقیم مجوزهای دسترسی (Pure ACL)"
+        subtitle="ویرایش اطلاعات هویتی، آواتار، نقش سازمانی، دامنه دسترسی به مشتریان و مجوزهای مستقیم (Pure ACL)"
         actions={
           !isCurrent && (isAdministrator || user.user_type !== 'administrator') ? (
             <button
@@ -329,67 +357,24 @@ export default function EditUserPage() {
             </Field>
           </div>
 
-          {/* User Type Selection */}
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
-            <div>
-              <p className="font-bold text-xs text-base-content">نوع کاربری (نقش سیستمی)</p>
-              <p className="text-[11px] text-base-content/60 mt-0.5">
-                {user.email === 'admin@crm.local'
-                  ? 'این حساب، مدیر ارشد اصلی سامانه است و نوع کاربری آن تغییرناپذیر است.'
-                  : isAdministrator
-                    ? 'تعیین سطح کاربری: مدیر ارشد یا مدیر عادی سامانه'
-                    : 'مشاهده سطح کاربری حساب'}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-              <label
-                className={cx(
-                  'flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition-all',
-                  watch('user_type') === 'manager'
-                    ? 'border-primary bg-primary/5 text-primary shadow-xs'
-                    : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/40',
-                  (!isAdministrator || user.email === 'admin@crm.local') && 'opacity-70 cursor-not-allowed',
-                )}
-              >
-                <input
-                  type="radio"
-                  value="manager"
-                  disabled={!isAdministrator || user.email === 'admin@crm.local'}
-                  className="radio radio-primary radio-sm"
-                  {...register('user_type')}
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-xs text-base-content">مدیر (Manager)</p>
-                  <p className="text-[11px] text-base-content/60">کاربر عملیاتی با مجوزهای تعیین‌شده</p>
-                </div>
-              </label>
-
-              {(isAdministrator || user.user_type === 'administrator') && (
-                <label
-                  className={cx(
-                    'flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition-all',
-                    watch('user_type') === 'administrator'
-                      ? 'border-amber-500 bg-amber-50/50 text-amber-900 shadow-xs dark:bg-amber-950/20 dark:text-amber-300'
-                      : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/40',
-                    (!isAdministrator || user.email === 'admin@crm.local') && 'opacity-70 cursor-not-allowed',
-                  )}
-                >
-                  <input
-                    type="radio"
-                    value="administrator"
-                    disabled={!isAdministrator || user.email === 'admin@crm.local'}
-                    className="radio radio-warning radio-sm"
-                    {...register('user_type')}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-xs text-base-content">مدیر ارشد (Administrator)</p>
-                    <p className="text-[11px] text-base-content/60">دسترسی به تمامی تنظیمات، برندینگ و رنگ</p>
-                  </div>
-                </label>
-              )}
-            </div>
-          </div>
+          {/* نقش سازمانی + دامنه دسترسی به مشتریان + استثنائهای اعطاشده (تسک ۱) */}
+          <RoleAccessFields
+            value={roleAccess}
+            onChange={setRoleAccess}
+            isAdministrator={isAdministrator}
+            lockRole={user.email === 'admin@crm.local' || (!isAdministrator && user.user_type === 'administrator')}
+            excludeUserId={id}
+            onApplyRoleDefaults={(perms) => {
+              const allowed = new Set(availablePermissions.map((p) => p.name))
+              const applicable = perms.filter((perm) => allowed.has(perm))
+              setSelectedPerms((prev) => [...new Set([...prev, ...applicable])])
+              toast.success(
+                applicable.length
+                  ? `${num(applicable.length)} مجوز پیش‌فرض نقش به فهرست مجوزها اضافه شد.`
+                  : 'هیچ مجوز پیش‌فرض جدیدی برای این نقش در دسترس شما نیست.',
+              )
+            }}
+          />
 
           {/* Active status */}
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
@@ -422,7 +407,7 @@ export default function EditUserPage() {
               <div>
                 <h3 className="text-base font-bold text-base-content">مجوزهای مستقیم کاربر (Pure ACL)</h3>
                 <p className="text-xs text-base-content/60">
-                  {selectedPerms.length} دسترسی از {availablePermissions.length} مجاز برای این کاربر تعیین شده است
+                  {num(selectedPerms.length)} دسترسی از {num(availablePermissions.length)} مجاز برای این کاربر تعیین شده است
                 </p>
                 {!isAdministrator && (
                   <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-1">
@@ -450,34 +435,39 @@ export default function EditUserPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {availablePermissions.map((perm) => {
-              const checked = selectedPerms.includes(perm.name)
-              return (
-                <label
-                  key={perm.name}
-                  onClick={() => togglePerm(perm.name)}
-                  className={cx(
-                    'flex items-start gap-3 rounded-2xl border p-3.5 cursor-pointer transition-all',
-                    checked
-                      ? 'border-primary bg-primary/5 text-primary shadow-xs'
-                      : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/40',
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    className="checkbox checkbox-primary checkbox-sm mt-0.5"
-                    checked={checked}
-                    onChange={() => {}}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-xs text-base-content">{perm.label}</p>
-                    <p className="font-mono text-[10px] text-base-content/50 mt-0.5">{perm.name}</p>
-                  </div>
-                </label>
-              )
-            })}
-          </div>
+          {permissionGroups.map(([group, perms]) => (
+            <div key={group} className="space-y-2">
+              <p className="text-[11px] font-black text-base-content/60">{group}</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {perms.map((perm) => {
+                  const checked = selectedPerms.includes(perm.name)
+                  return (
+                    <label
+                      key={perm.name}
+                      onClick={() => togglePerm(perm.name)}
+                      className={cx(
+                        'flex cursor-pointer items-start gap-3 rounded-2xl border p-3.5 transition-all',
+                        checked
+                          ? 'border-primary bg-primary/5 text-primary shadow-xs'
+                          : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/40',
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-primary checkbox-sm mt-0.5"
+                        checked={checked}
+                        onChange={() => {}}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-base-content">{perm.label}</p>
+                        <p className="mt-0.5 font-mono text-[10px] text-base-content/50">{perm.name}</p>
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* Action Buttons */}

@@ -2,70 +2,35 @@
 
 namespace App\Exports;
 
-use App\Models\Customer;
-use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithMapping;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use App\Models\User;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
-class CustomersExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ *  v2.0.0 — تسک ۶: خروجی اکسل کامل مشتریان
+ *
+ *  فایل خروجی شامل دو شیت است:
+ *    ۱) «مشتریان»                 → اطلاعات پایه + خلاصه دستگاه‌های تخصیص‌یافته
+ *    ۲) «دستگاه‌های تخصیص‌یافته»  → یک ردیف برای هر تخصیص (سریال، تعداد، فاکتور)
+ *
+ *  خروجی دقیقاً به همان دامنه دسترسی کاربر محدود می‌شود (تسک ۱).
+ *  قالب xlsx ذاتاً UTF-8 است و کاراکترهای فارسی در Excel به‌هم نمی‌ریزد.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+class CustomersExport implements WithMultipleSheets
 {
-    protected $type;
-
-    public function __construct(?string $type = null)
+    public function __construct(protected ?string $type = null, protected ?User $user = null)
     {
-        $this->type = $type;
-    }
-
-    public function collection()
-    {
-        $query = Customer::latest();
-        if ($this->type && in_array($this->type, ['potential', 'effective'])) {
-            $query->where('customer_type', $this->type);
-        }
-        return $query->get();
-    }
-
-    public function headings(): array
-    {
-        return [
-            'نوع مشتری',
-            'نوع شخص',
-            'نام',
-            'نام خانوادگی',
-            'نام شرکت',
-            'کد ملی / شناسه ملی',
-            'شماره همراه',
-            'تلفن ثابت',
-            'ایمیل',
-            'استان',
-            'شهر',
-            'آدرس',
-            'یادداشت',
-            'تاریخ ثبت',
-        ];
     }
 
     /**
-     * @param Customer $customer
+     * @return array<int|string, \Maatwebsite\Excel\Concerns\Exportable>
      */
-    public function map($customer): array
+    public function sheets(): array
     {
         return [
-            $customer->customer_type === 'effective' ? 'بالفعل' : 'بالقوه',
-            $customer->type === 'company' ? 'حقوقی' : 'حقیقی',
-            $customer->first_name,
-            $customer->last_name,
-            $customer->company_name ?? '',
-            $customer->national_code ?? '',
-            $customer->mobile,
-            $customer->phone ?? '',
-            $customer->email ?? '',
-            $customer->province ?? '',
-            $customer->city ?? '',
-            $customer->address ?? '',
-            $customer->notes ?? '',
-            $customer->created_at?->format('Y/m/d H:i') ?? '',
+            'مشتریان' => new CustomersSheet($this->type, $this->user),
+            'دستگاه‌های تخصیص‌یافته' => new CustomerDevicesSheet($this->type, $this->user),
         ];
     }
 }

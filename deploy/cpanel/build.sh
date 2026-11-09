@@ -68,6 +68,19 @@ mkdir -p "$APP/public"
 for file in index.php private-path.php resolve-private.php; do
   cp "$ROOT/backend/public/$file" "$APP/public/$file"
 done
+# Custom public assets that Composer/Filament never publish (Persian Vazirmatn font + panel CSS).
+# Without this step the admin panel silently falls back to a Latin font on cPanel hosts.
+if [[ -d "$ROOT/backend/public/css" ]]; then
+  mkdir -p "$APP/public/css"
+  find "$ROOT/backend/public/css" -maxdepth 1 -type f -name '*.css' -exec cp {} "$APP/public/css/" \;
+fi
+if [[ -d "$ROOT/backend/public/fonts" ]]; then
+  mkdir -p "$APP/public/fonts"
+  find "$ROOT/backend/public/fonts" -maxdepth 1 -type f \( -name '*.woff2' -o -name '*.woff' -o -name '*.ttf' \) -exec cp {} "$APP/public/fonts/" \;
+fi
+for file in favicon.ico robots.txt; do
+  if [[ -f "$ROOT/backend/public/$file" ]]; then cp "$ROOT/backend/public/$file" "$APP/public/$file"; fi
+done
 (cd "$ROOT/frontend" && tar -cf - src index.html package.json package-lock.json tsconfig.json tsconfig.app.json tsconfig.node.json vite.config.ts) | (cd "$FRONT" && tar -xf -)
 if [[ -d "$ROOT/frontend/public" ]]; then cp -R "$ROOT/frontend/public" "$FRONT/"; fi
 if [[ -n "$(find "$APP" "$FRONT" -type l -print -quit)" ]]; then
@@ -139,6 +152,10 @@ for file in index.php index.html .htaccess resolve-private.php private-path.php 
   [[ -s "$PUBLIC/$file" ]] || fail "Missing public release file: $file"
 done
 [[ -d "$PUBLIC/css/filament" && -d "$PUBLIC/js/filament" ]] || fail 'Filament assets were not published by Composer scripts.'
+# Persian Vazirmatn (Farsi-Digits) assets must ship with the public release, otherwise the
+# admin panel and exported pages silently fall back to a Latin font with Latin digits.
+[[ -s "$PUBLIC/css/vazirmatn.css" ]] || fail 'Missing public/css/vazirmatn.css in the release.'
+[[ -s "$PUBLIC/fonts/vazirmatn-fd-Regular.woff2" ]] || fail 'Missing Vazirmatn FD font files in the release.'
 if [[ -n "$(find "$APP" "$PUBLIC" -type l -print -quit)" ]]; then fail 'Release contains a symlink.'; fi
 
 STEP='ZIP verification'

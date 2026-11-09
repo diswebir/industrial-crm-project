@@ -21,7 +21,7 @@ import { PasswordRulesTooltip } from '../../components/ui/PasswordRulesTooltip'
 import { Avatar } from '../../components/ui/Avatar'
 import { authApi } from '../../services/api'
 import { useAuthStore } from '../../store/useAuthStore'
-import { roleLabel } from '../../utils/meta'
+import { customerScopeShort, userRoleLabel } from '../../utils/meta'
 import { num, toEnDigits } from '../../utils/format'
 
 const schema = z.object({
@@ -163,11 +163,14 @@ export default function MyProfilePage() {
             <h2 className="text-xl font-bold text-base-content">{currentUser.name}</h2>
             <p className="text-xs text-base-content/60 font-mono ltr-text">{currentUser.email}</p>
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-2">
-              <span className="badge badge-sm bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800">
-                {roleLabel[currentUser.role || 'admin']}
+              <span className="badge badge-sm border border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300">
+                {currentUser.role_label || userRoleLabel[currentUser.user_type || 'manager']}
               </span>
-              <span className="badge badge-sm bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
-                حساب فعال
+              <span className="badge badge-sm border border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                دامنه دسترسی: {customerScopeShort[currentUser.customers_scope || 'all']}
+              </span>
+              <span className="badge badge-sm border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                {currentUser.is_active === false ? 'حساب غیرفعال' : 'حساب فعال'}
               </span>
             </div>
           </div>
