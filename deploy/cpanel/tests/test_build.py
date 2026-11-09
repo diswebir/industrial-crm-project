@@ -59,6 +59,11 @@ class BuildTest(unittest.TestCase):
             (self.root/'backend'/name).write_text('{}')
         for name in ['index.php', 'private-path.php', 'resolve-private.php']:
             (self.root/'backend/public'/name).write_text('<?php // fixture')
+        # فونت/استایل وزیرمتن FD بخشی از سورس است و باید در بسته عمومی قرار گیرد.
+        (self.root/'backend/public/css').mkdir(parents=True)
+        (self.root/'backend/public/css/vazirmatn.css').write_text('/* Vazirmatn FD fixture */')
+        (self.root/'backend/public/fonts').mkdir(parents=True)
+        (self.root/'backend/public/fonts/Vazirmatn-FD-Regular.woff2').write_text('font-fixture')
         for name in ['src', 'public']:
             (self.root/'frontend'/name).mkdir(parents=True)
         for name in ['index.html', 'package.json', 'package-lock.json', 'tsconfig.json', 'tsconfig.app.json', 'tsconfig.node.json', 'vite.config.ts', 'src/main.ts']:
