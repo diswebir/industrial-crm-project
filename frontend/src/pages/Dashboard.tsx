@@ -117,15 +117,17 @@ export default function Dashboard() {
           loading={isLoading}
           to="/customers"
         />
-        <StatCard
-          title="موجودی انبار"
-          value={num(stats.total_stock ?? 0)}
-          icon={Warehouse}
-          tone="warning"
-          hint="ورود / خروج و تاریخچه انبار"
-          loading={isLoading}
-          to="/inventory"
-        />
+        <Can permission="inventory.view">
+          <StatCard
+            title="موجودی انبار"
+            value={num(stats.total_stock ?? 0)}
+            icon={Warehouse}
+            tone="warning"
+            hint="ورود / خروج و تاریخچه انبار"
+            loading={isLoading}
+            to="/inventory"
+          />
+        </Can>
         <StatCard
           title="پیامک‌های ارسالی"
           value={num(stats.total_sms_sent)}
