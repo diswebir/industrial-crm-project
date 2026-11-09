@@ -13,6 +13,29 @@ cPanel نصب شده است توضیح می‌دهد. برنامه روی cPanel
 
 ---
 
+## به‌روزرسانی ۲٫۰٫۱ (نسخه پچ رفع اشکال)
+
+اگر نسخه ۲٫۰٫۰ را نصب کرده‌اید، برای رسیدن به ۲٫۰٫۱ **هیچ تغییری در دیتابیس لازم نیست** و
+اجرای دوباره فایل SQL ضروری نیست. فقط فایل‌های بک‌اند/فرانت‌اند این نسخه را جایگزین کنید:
+
+```
+backend/app/Exports/CustomersTemplateExport.php
+backend/app/Http/Controllers/Api/V1/CustomerController.php
+backend/app/Http/Controllers/Api/V1/InventoryController.php
+backend/app/Http/Controllers/Api/V1/PartController.php
+backend/app/Http/Controllers/Api/V1/SmsController.php
+backend/app/Imports/CustomersImport.php
+backend/app/Models/Customer.php
+backend/database/seeders/DatabaseSeeder.php
+frontend/ (فقط اجرای build و آپلود پوشه build در public_html)
+```
+
+سپس در `public_html` فایل‌های build جدید را جایگزین کنید و یک‌بار `php artisan config:clear`
+(یا از Route پاک‌سازی کش) را اجرا کنید. جزئیات فهرست کامل فایل‌ها در بخش ۱ آمده است.
+
+---
+
+
 ## ۰) پیش از هر کاری: بکاپ کامل
 
 1. **بکاپ دیتابیس:** cPanel → phpMyAdmin → دیتابیس سامانه → تب Export → روش

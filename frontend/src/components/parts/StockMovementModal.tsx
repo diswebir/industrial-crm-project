@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -56,6 +56,9 @@ export function StockMovementModal({
 
   const selectedPart = useMemo(() => parts.find((p) => String(p.id) === partId), [parts, partId])
 
+  // با هر بار باز شدن مودال یک‌بار مقدار‌دهی می‌کنیم؛ refetch کاتالوگ نباید فرم را پاک کند.
+  const wasOpenRef = useRef(false)
+
   const partOptions = useMemo(
     () =>
       parts.map((p) => ({
@@ -67,7 +70,13 @@ export function StockMovementModal({
   )
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      wasOpenRef.current = false
+      return
+    }
+
+    if (wasOpenRef.current) return
+    wasOpenRef.current = true
 
     const preferred = defaultPartId ? parts.find((p) => String(p.id) === String(defaultPartId)) : undefined
     const fallback = preferred ?? parts[0]
@@ -79,6 +88,16 @@ export function StockMovementModal({
       note: '',
     })
   }, [open, parts, defaultPartId, defaultType, reset])
+
+  // اگر فهرست دستگاه‌ها بعد از باز شدن مودال برسد، فقط انتخاب دستگاه را کامل می‌کنیم.
+  useEffect(() => {
+    if (!open || partId || !parts.length) return
+    const preferred = defaultPartId ? parts.find((p) => String(p.id) === String(defaultPartId)) : undefined
+    const fallback = preferred ?? parts[0]
+    if (fallback) {
+      setValue('part_id', String(fallback.id), { shouldValidate: true })
+    }
+  }, [open, partId, parts, defaultPartId, setValue])
 
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {

@@ -518,7 +518,7 @@ export default function Parts() {
         onClose={() => setDeletingPart(null)}
         onConfirm={() => deletingPart && deleteMutation.mutate(deletingPart.id)}
         title="حذف دستگاه از کاتالوگ"
-        message={`آیا از حذف مدل دستگاه «${deletingPart?.name}» اطمینان دارید؟ این عملیات فقط برای دستگاه‌های بدون تخصیص و با موجودی صفر مجاز است.`}
+        message={`آیا از حذف مدل دستگاه «${deletingPart?.name}» اطمینان دارید؟ حذف فقط برای دستگاه‌های بدون تخصیص، با موجودی صفر و بدون سابقه انبار مجاز است؛ در غیر این صورت دستگاه را «غیرفعال» کنید.`}
         confirmText="بله، حذف کن"
         tone="error"
         loading={deleteMutation.isPending}

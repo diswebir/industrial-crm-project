@@ -6,14 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\InventoryLog;
 use App\Models\Part;
+use App\Services\Customers\CustomerAccessService;
 use App\Services\Inventory\InventoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class InventoryController extends Controller
 {
-    public function __construct(protected InventoryService $inventory)
-    {
+    public function __construct(
+        protected InventoryService $inventory,
+        protected CustomerAccessService $access
+    ) {
     }
 
     /**
@@ -31,6 +34,18 @@ class InventoryController extends Controller
                 'customer:id,first_name,last_name,company_name,type',
             ])
             ->latest();
+
+        // کاربران با دامنه دسترسی محدود، فقط تراکنش‌های انبار بدون مشتری یا
+        // مربوط به مشتریان مجاز خودشان را می‌بینند (تسک ۱).
+        if (! $this->access->hasFullAccess($request->user())) {
+            $visibleIds = $this->access->visibleCustomerIds($request->user());
+            $query->where(function ($q) use ($visibleIds) {
+                $q->whereNull('customer_id');
+                if (! empty($visibleIds)) {
+                    $q->orWhereIn('customer_id', $visibleIds);
+                }
+            });
+        }
 
         if ($request->filled('part_id')) {
             $query->where('part_id', (int) $request->part_id);
@@ -57,7 +72,8 @@ class InventoryController extends Controller
         }
 
         if ($request->filled('q')) {
-            $term = trim($request->q);
+            // جستجو با ارقام فارسی/عربی هم کار کند (فونت FD ارقام را فارسی نشان می‌دهد).
+            $term = $this->toLatinDigits(trim((string) $request->q));
             $op = $this->likeOp();
             $query->where(function ($q) use ($term, $op) {
                 $q->whereHas('part', function ($p) use ($term, $op) {

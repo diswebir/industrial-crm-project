@@ -42,7 +42,8 @@ class CustomerController extends Controller
         }
 
         if ($request->filled('q')) {
-            $term = trim($request->q);
+            // جستجو با ارقام فارسی/عربی هم کار کند (فونت FD ارقام را فارسی نشان می‌دهد).
+            $term = $this->toLatinDigits(trim((string) $request->q));
             $op = $this->likeOp();
             $query->where(function ($q) use ($term, $op) {
                 $q->where('first_name', $op, "%{$term}%")
@@ -216,6 +217,7 @@ class CustomerController extends Controller
 
         $import = new CustomersImport();
         $import->setCreatorUserId($request->user()?->id);
+        $import->setCanUpdateAnyCustomer($this->access->hasFullAccess($request->user()));
         Excel::import($import, $request->file('file'));
 
         return response()->json([

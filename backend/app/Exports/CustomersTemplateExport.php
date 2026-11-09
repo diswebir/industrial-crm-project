@@ -43,7 +43,7 @@ class CustomersTemplateExport implements FromArray, WithHeadings, ShouldAutoSize
                 'تهران',
                 'تهران',
                 'خیابان مطهری، پلاک ۱۲',
-                'مشتری فعال خط تولید قطعات صنعتی',
+                'مشتری فعال خط تولید دستگاه‌های صنعتی',
             ],
             [
                 'بالقوه',

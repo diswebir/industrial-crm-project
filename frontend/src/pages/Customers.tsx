@@ -219,7 +219,7 @@ export default function Customers() {
       {/* Table Section */}
       <div className="overflow-hidden rounded-2xl border border-base-200 bg-base-100 shadow-xs">
         {isLoading ? (
-          <TableSkeleton rows={PAGE_SIZE} cols={6} />
+          <TableSkeleton rows={PAGE_SIZE} cols={7} />
         ) : !customers.length ? (
           <EmptyState
             title="مشتری‌ای یافت نشد"
@@ -299,7 +299,7 @@ export default function Customers() {
                     </td>
 
                     <td className="space-y-0.5 text-xs">
-                      <p className="font-mono font-medium ltr-text text-start">{c.mobile}</p>
+                      <p className="font-mono font-medium ltr-text text-start">{c.mobile || '—'}</p>
                       {c.phone && <p className="text-base-content/50 font-mono ltr-text text-start">{c.phone}</p>}
                     </td>
 

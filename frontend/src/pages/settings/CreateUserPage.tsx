@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
@@ -75,6 +75,17 @@ export default function CreateUserPage() {
       data_scope: 'all',
     },
   })
+
+  const userType = watch('user_type')
+
+  // نقش‌های عملیاتی (کارمند فروش/نصاب) به‌صورت پیش‌فرض فقط مشتریان خودشان را می‌بینند.
+  // مدیر ارشد می‌تواند بعد از انتخاب نقش، دامنه را دستی به «همه» تغییر دهد.
+  useEffect(() => {
+    if (!isAdministrator) return
+    if (userType === 'salesperson' || userType === 'installer') {
+      setValue('data_scope', 'own')
+    }
+  }, [userType, isAdministrator, setValue])
 
   const togglePerm = (permName: string) => {
     setSelectedPerms((prev) =>

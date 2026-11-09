@@ -33,6 +33,19 @@ class Customer extends Model
     protected $appends = ['full_name', 'display_name'];
 
     /**
+     * ثبت خودکار مالک پرونده هنگام ساخت (برای مسیرهایی مثل پنل مدیریت Filament که
+     * created_by را دستی ست نمی‌کنند). در API این مقدار صریحاً همان کاربر است.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (Customer $customer) {
+            if (empty($customer->created_by) && auth()->check()) {
+                $customer->created_by = auth()->id();
+            }
+        });
+    }
+
+    /**
      * نام نمایشی مشتری:
      *  - شخص حقوقی → نام شرکت (در صورت خالی بودن، نام/نام‌خانوادگی)
      *  - شخص حقیقی → نام و نام خانوادگی (در صورت خالی بودن، نام شرکت)

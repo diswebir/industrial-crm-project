@@ -4,7 +4,7 @@
 
 | مورد | مقدار |
 |---|---|
-| نسخه فعلی | **2.0.0** |
+| نسخه فعلی | **2.0.1** |
 | تاریخچه تغییرات | [`CHANGELOG.md`](CHANGELOG.md) |
 | راهنمای ارتقا روی cPanel | [`docs/upgrade-v2-cpanel.fa.md`](docs/upgrade-v2-cpanel.fa.md) |
 | چک‌لیست آزمون پذیرش | [`docs/PHASE3-ACCEPTANCE.fa.md`](docs/PHASE3-ACCEPTANCE.fa.md) |
@@ -154,7 +154,7 @@ docker exec -it crm_backend php artisan migrate:fresh --seed
     ├── src/
     │   ├── components/         # کامپوننت‌های فرم، تخصیص دستگاه، انبار، سابقه سرویس و اکسل
     │   ├── layouts/            # سایدبار و لایوت اصلی با کنترل ACL
-    │   ├── pages/              # داشبورد، مشتریان، قطعات، پیامک، تنظیمات، لاگین
+    │   ├── pages/              # داشبورد، مشتریان، دستگاه‌ها، انبار، پیامک، تنظیمات، لاگین
     │   ├── services/api.ts     # اینترفیس تایپ‌شده Axios
     │   ├── store/useAuthStore.ts # مدیریت دسترسی‌ها و توکن Sanctum
     │   └── types/index.ts      # تایپ‌های کامل TypeScript

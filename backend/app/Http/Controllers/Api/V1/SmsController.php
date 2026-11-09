@@ -76,7 +76,8 @@ class SmsController extends Controller
         }
 
         if ($request->filled('q')) {
-            $term = trim($request->q);
+            // جستجو با ارقام فارسی/عربی هم کار کند (فونت FD ارقام را فارسی نشان می‌دهد).
+            $term = $this->toLatinDigits(trim((string) $request->q));
             $op = $this->likeOp();
             $query->where(function ($q) use ($term, $op) {
                 $q->where('recipient_mobile', $op, "%{$term}%")

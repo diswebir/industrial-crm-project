@@ -35,7 +35,8 @@ class PartController extends Controller
             ->latest();
 
         if ($request->filled('q')) {
-            $term = trim($request->q);
+            // جستجو با ارقام فارسی/عربی هم کار کند (فونت FD ارقام را فارسی نشان می‌دهد).
+            $term = $this->toLatinDigits(trim((string) $request->q));
             $op = $this->likeOp();
             $query->where(function ($q) use ($term, $op) {
                 $q->where('name', $op, "%{$term}%")
@@ -183,6 +184,14 @@ class PartController extends Controller
         if ((int) $part->stock_quantity > 0) {
             return response()->json([
                 'message' => 'موجودی انبار این دستگاه صفر نیست. ابتدا موجودی را در بخش انبار اصلاح یا خارج کنید.',
+            ], 422);
+        }
+
+        // حفظ تاریخچه انبار: حذف دستگاه دارای لاگ، ردیف‌های لاگ را بی‌مرجع می‌کند.
+        // به‌جای حذف، دستگاه را غیرفعال کنید تا در کاتالوگ بماند و تاریخچه حفظ شود.
+        if ($part->inventoryLogs()->exists()) {
+            return response()->json([
+                'message' => 'این دستگاه سابقه ورود/خروج در انبار دارد و برای حفظ تاریخچه قابل حذف نیست. آن را «غیرفعال» کنید.',
             ], 422);
         }
 

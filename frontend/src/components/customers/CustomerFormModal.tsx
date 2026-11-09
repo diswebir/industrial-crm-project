@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -136,8 +136,23 @@ export function CustomerFormModal({ open, onClose, customer, onSuccess }: Custom
     defaultValues: EMPTY_VALUES,
   })
 
+  // فقط در لحظه باز شدن (یا تغییر مشتریِ در حال ویرایش) فرم را مقدار‌دهی می‌کنیم؛
+  // refetch خودکار مشتری نباید ورودی‌های در حال تکمیل را پاک کند.
+  const wasOpenRef = useRef(false)
+  const lastCustomerIdRef = useRef<string | undefined>(undefined)
+
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      wasOpenRef.current = false
+      lastCustomerIdRef.current = undefined
+      return
+    }
+
+    const currentId = customer ? String(customer.id) : undefined
+    if (wasOpenRef.current && lastCustomerIdRef.current === currentId) return
+
+    wasOpenRef.current = true
+    lastCustomerIdRef.current = currentId
 
     if (customer) {
       reset({

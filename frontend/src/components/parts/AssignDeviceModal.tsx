@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -60,6 +60,9 @@ export function AssignDeviceModal({ open, onClose, customer, assignment, onSucce
 
   const today = new Date().toISOString().slice(0, 10)
 
+  // جلوگیری از بازنویسی فرم در حال تکمیل هنگام refetch کاتالوگ (focus/refetch).
+  const wasOpenRef = useRef(false)
+
   const {
     register,
     handleSubmit,
@@ -114,7 +117,13 @@ export function AssignDeviceModal({ open, onClose, customer, assignment, onSucce
   }, [parts])
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      wasOpenRef.current = false
+      return
+    }
+
+    if (wasOpenRef.current) return
+    wasOpenRef.current = true
 
     if (assignment) {
       reset({
@@ -148,6 +157,16 @@ export function AssignDeviceModal({ open, onClose, customer, assignment, onSucce
       notes: '',
     })
   }, [open, assignment, parts, reset, today])
+
+  // اگر مودال پیش از بارگذاری کاتالوگ باز شود، پس از رسیدن داده‌ها فقط فیلد
+  // انتخاب دستگاه را مقدار می‌دهیم و بقیه ورودی‌های کاربر را دست نمی‌زنیم.
+  useEffect(() => {
+    if (!open || partId || !parts.length) return
+    const firstAvailable = parts.find((p) => (p.stock_quantity ?? 0) > 0) ?? parts[0]
+    if (firstAvailable) {
+      setValue('part_id', String(firstAvailable.id), { shouldValidate: true })
+    }
+  }, [open, partId, parts, setValue])
 
   const saveMutation = useMutation({
     mutationFn: async (values: FormValues) => {

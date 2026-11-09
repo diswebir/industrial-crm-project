@@ -13,10 +13,22 @@ class CustomersImport implements ToModel, WithHeadingRow, SkipsEmptyRows
     private array $errors = [];
     private ?int $creatorUserId = null;
 
+    /** آیا کاربر مجاز است پرونده مشتریان سایر کارشناسان را به‌روزرسانی کند؟ */
+    private bool $canUpdateAnyCustomer = true;
+
     /** ثبت‌کننده مشتریان واردشده (مالکیت پرونده برای RBAC). */
     public function setCreatorUserId(?int $userId): void
     {
         $this->creatorUserId = $userId;
+    }
+
+    /**
+     * کاربران با دامنه دسترسی محدود نباید بتوانند از طریق ایمپورت، مشتری
+     * کارشناسان دیگر را بازنویسی کنند (تسک ۱).
+     */
+    public function setCanUpdateAnyCustomer(bool $canUpdateAny): void
+    {
+        $this->canUpdateAnyCustomer = $canUpdateAny;
     }
 
     public function model(array $row)
@@ -77,6 +89,17 @@ class CustomersImport implements ToModel, WithHeadingRow, SkipsEmptyRows
         }
 
         $existing = Customer::where($matchKey)->first();
+
+        if (
+            $existing
+            && ! $this->canUpdateAnyCustomer
+            && $this->creatorUserId
+            && $existing->created_by !== null
+            && (int) $existing->created_by !== (int) $this->creatorUserId
+        ) {
+            $this->errors[] = "سطر مربوط به مشتری «{$existing->full_name}» متعلق به کارشناس دیگری است و به‌روزرسانی نشد.";
+            return null;
+        }
 
         $this->importedCount++;
 
