@@ -95,3 +95,23 @@ workflow `cpanel.yml` حالا دو job دارد: `package` (ساخت و همه 
 - `download-release.ps1` روی PowerShell واقعی ویندوز اجرا نشده است؛ فقط بازبینی ایستا.
 - چهار آزمون ساختاری `test_release_workflow.py` به PyYAML نیاز دارند و در صورت نبود آن skip
   می‌شوند؛ بقیه آزمون‌ها بدون وابستگی اجرا می‌شوند.
+
+## نسخه اکشن‌های GitHub عمداً روی v4 نگه داشته شد
+
+رانر هشدار می‌دهد که `actions/checkout@v4`، `actions/setup-node@v4` و `actions/upload-artifact@v4`
+هدف Node.js 20 هستند و به‌اجبار روی Node 24 اجرا می‌شوند. این **هشدار است نه خطا** و اجرای
+`42650848780` با همین نسخه‌ها سبز شد.
+
+دلیل ارتقا ندادن در این مرحله:
+
+| اکشن | آخرین نسخه | ریسک ارتقا |
+| :-- | :-- | :-- |
+| `actions/upload-artifact` | v7.0.2 | v5.0.0 «BREAKING CHANGE: supports Node v24» — کم‌خطر، ولی مستندات اکشن می‌گوید upload و download **باید هم‌نسخه باشند** |
+| `actions/download-artifact` | v8.0.2 | v8.0.0 رفتار unzip را عوض کرده («no longer attempt to unzip all downloaded files» + «Enforced checks (breaking)») ⇒ ممکن است در job انتشار، ZIPها به‌جای استخراج، به‌صورت کانتینر خام دانلود شوند |
+| `actions/checkout` | v7.0.1 | کم‌خطر |
+| `actions/setup-node` | v7.1.0 | کم‌خطر |
+
+مسیر `download-artifact` **فقط در job `release` اجرا می‌شود که روی PRها skip است**؛ بنابراین
+ارتقای آن در این PR قابل راستی‌آزمایی نبود و ارتقای کور می‌توانست اولین انتشار واقعی را بشکند.
+ارتقا باید در یک تغییر جداگانه و همراه با یک push واقعی به `main` (یا یک تگ آزمایشی) انجام و
+لاگ گام «Verify downloaded archives» بررسی شود.
