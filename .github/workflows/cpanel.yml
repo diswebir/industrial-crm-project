@@ -113,7 +113,14 @@ jobs:
           server=$!
           trap 'kill "$server" || true' EXIT
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:5173/ >/dev/null && break; sleep 1; done
-          node tests/browser-smoke.cjs
+          set +e
+          node tests/browser-smoke.cjs > /tmp/crm-browser.log 2>&1
+          status=$?
+          cat /tmp/crm-browser.log
+          if [ "$status" -ne 0 ]; then
+            python3 -c 'from pathlib import Path; s=Path("/tmp/crm-browser.log").read_text()[-15000:]; print("::error title=Browser test details::"+s.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))'
+          fi
+          exit "$status"
       - name: Real installer GET/POST, failure diagnostics and retry tests
         env:
           CPANEL_INSTALLER_HTTP: '1'
