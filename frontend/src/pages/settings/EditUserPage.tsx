@@ -79,6 +79,8 @@ export default function EditUserPage() {
     enabled: Boolean(id) && hasPermission('users.manage'),
   })
 
+  const isRootAccount = Number(user?.id) === 1
+
   const { data: availablePermissions = [] } = useQuery({
     queryKey: ['available-permissions'],
     queryFn: usersApi.getAvailablePermissions,
@@ -285,8 +287,13 @@ export default function EditUserPage() {
               <input
                 type="email"
                 dir="ltr"
-                className="input input-bordered w-full text-start font-mono text-sm"
+                className={cx(
+                  'input input-bordered w-full text-start font-mono text-sm',
+                  isRootAccount && !isCurrent && 'opacity-70 cursor-not-allowed',
+                )}
                 placeholder="user@example.com"
+                disabled={isRootAccount && !isCurrent}
+                title={isRootAccount && !isCurrent ? 'ایمیل مدیر اصلی فقط توسط خود او قابل تغییر است.' : undefined}
                 {...register('email')}
               />
             </Field>
@@ -335,7 +342,7 @@ export default function EditUserPage() {
             <div>
               <p className="font-bold text-xs text-base-content">نوع کاربری (نقش سیستمی)</p>
               <p className="text-[11px] text-base-content/60 mt-0.5">
-                {user.email === 'admin@crm.local'
+                {isRootAccount
                   ? 'این حساب، مدیر ارشد اصلی سامانه است و نوع کاربری آن تغییرناپذیر است.'
                   : isAdministrator
                     ? 'تعیین سطح کاربری: مدیر ارشد یا مدیر عادی سامانه'
@@ -350,13 +357,13 @@ export default function EditUserPage() {
                   watch('user_type') === 'manager'
                     ? 'border-primary bg-primary/5 text-primary shadow-xs'
                     : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/40',
-                  (!isAdministrator || user.email === 'admin@crm.local') && 'opacity-70 cursor-not-allowed',
+                  (!isAdministrator || isRootAccount) && 'opacity-70 cursor-not-allowed',
                 )}
               >
                 <input
                   type="radio"
                   value="manager"
-                  disabled={!isAdministrator || user.email === 'admin@crm.local'}
+                  disabled={!isAdministrator || isRootAccount}
                   className="radio radio-primary radio-sm"
                   {...register('user_type')}
                 />
@@ -373,13 +380,13 @@ export default function EditUserPage() {
                     watch('user_type') === 'salesperson'
                       ? 'border-blue-500 bg-blue-50/50 text-blue-900 shadow-xs dark:bg-blue-950/20 dark:text-blue-300'
                       : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/40',
-                    user.email === 'admin@crm.local' && 'opacity-70 cursor-not-allowed',
+                    isRootAccount && 'opacity-70 cursor-not-allowed',
                   )}
                 >
                   <input
                     type="radio"
                     value="salesperson"
-                    disabled={user.email === 'admin@crm.local'}
+                    disabled={isRootAccount}
                     className="radio radio-info radio-sm"
                     {...register('user_type')}
                   />
@@ -397,13 +404,13 @@ export default function EditUserPage() {
                     watch('user_type') === 'installer'
                       ? 'border-emerald-500 bg-emerald-50/50 text-emerald-900 shadow-xs dark:bg-emerald-950/20 dark:text-emerald-300'
                       : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/40',
-                    user.email === 'admin@crm.local' && 'opacity-70 cursor-not-allowed',
+                    isRootAccount && 'opacity-70 cursor-not-allowed',
                   )}
                 >
                   <input
                     type="radio"
                     value="installer"
-                    disabled={user.email === 'admin@crm.local'}
+                    disabled={isRootAccount}
                     className="radio radio-success radio-sm"
                     {...register('user_type')}
                   />
@@ -421,13 +428,13 @@ export default function EditUserPage() {
                     watch('user_type') === 'administrator'
                       ? 'border-amber-500 bg-amber-50/50 text-amber-900 shadow-xs dark:bg-amber-950/20 dark:text-amber-300'
                       : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/40',
-                    (!isAdministrator || user.email === 'admin@crm.local') && 'opacity-70 cursor-not-allowed',
+                    (!isAdministrator || isRootAccount) && 'opacity-70 cursor-not-allowed',
                   )}
                 >
                   <input
                     type="radio"
                     value="administrator"
-                    disabled={!isAdministrator || user.email === 'admin@crm.local'}
+                    disabled={!isAdministrator || isRootAccount}
                     className="radio radio-warning radio-sm"
                     {...register('user_type')}
                   />

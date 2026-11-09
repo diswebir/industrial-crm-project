@@ -29,7 +29,7 @@ const schema = z
     phone: z
       .string()
       .trim()
-      .regex(/^0\d{10}$/, 'شماره تلفن ثابت باید ۱۱ رقم عددی بوده و با 0 شروع شود (مثال: 02188776655)')
+      .regex(/^0\d{7,10}$/, 'شماره تلفن ثابت باید ۸ تا ۱۱ رقم عددی بوده و با 0 شروع شود (مثال: 02188776655)')
       .or(z.literal(''))
       .optional(),
     email: z.string().trim().email('فرمت آدرس ایمیل معتبر نیست').or(z.literal('')).optional(),
@@ -80,19 +80,12 @@ const schema = z
     }
 
     if (data.national_code && data.national_code.length > 0) {
-      if (data.type === 'individual' && !/^\d{10}$/.test(data.national_code)) {
+      // هر دو طول ۱۰ و ۱۱ برای سازگاری با پرونده‌های قدیمی پذیرفته می‌شود.
+      if (!/^\d{10,11}$/.test(data.national_code)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['national_code'],
-          message: 'کد ملی برای شخص حقیقی باید دقیقاً ۱۰ رقم عددی باشد',
-        })
-      }
-
-      if (data.type === 'company' && !/^\d{11}$/.test(data.national_code)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['national_code'],
-          message: 'شناسه ملی برای شخص حقوقی باید دقیقاً ۱۱ رقم عددی باشد',
+          message: 'کد ملی / شناسه ملی باید ۱۰ یا ۱۱ رقم عددی باشد',
         })
       }
     }
@@ -372,7 +365,7 @@ export function CustomerFormModal({ open, onClose, customer, onSuccess }: Custom
               }}
             />
           </Field>
-          <Field label="تلفن ثابت (۱۱ رقم با 0)" error={errors.phone?.message}>
+          <Field label="تلفن ثابت (۸ تا ۱۱ رقم با 0)" error={errors.phone?.message}>
             <input
               dir="ltr"
               className="input input-bordered w-full text-start"

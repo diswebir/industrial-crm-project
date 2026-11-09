@@ -108,9 +108,23 @@ class InventoryController extends Controller
         $totalAllocated = (int) $parts->sum(fn (Part $p) => (int) ($p->allocated_quantity ?? 0));
         $lowStock = $parts->filter(fn (Part $p) => (int) $p->min_stock_quantity > 0 && (int) $p->stock_quantity <= (int) $p->min_stock_quantity)->count();
 
-        $todayMoves = InventoryLog::query()
-            ->whereDate('created_at', now()->toDateString())
-            ->count();
+        $user = auth()->user();
+        $todayMovesQuery = InventoryLog::query()
+            ->whereDate('created_at', now()->toDateString());
+
+        // شمارنده «تراکنش‌های امروز» باید با همان دامنه‌ای که در جدول لاگ‌ها
+        // نمایش داده می‌شود هم‌خوان باشد.
+        if ($user && ! $this->access->hasFullAccess($user)) {
+            $visibleIds = $this->access->visibleCustomerIds($user);
+            $todayMovesQuery->where(function ($q) use ($visibleIds) {
+                $q->whereNull('customer_id');
+                if (! empty($visibleIds)) {
+                    $q->orWhereIn('customer_id', $visibleIds);
+                }
+            });
+        }
+
+        $todayMoves = $todayMovesQuery->count();
 
         return response()->json([
             'total_parts' => $parts->count(),

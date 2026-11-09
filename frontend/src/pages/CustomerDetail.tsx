@@ -27,6 +27,7 @@ import { AssignDeviceModal } from '../components/parts/AssignDeviceModal'
 import { ServiceHistoryModal } from '../components/parts/ServiceHistoryModal'
 import { Can } from '../components/common/Can'
 import { customerApi, partApi } from '../services/api'
+import { useAuthStore } from '../store/useAuthStore'
 import { cx, dateFa, dateShort, num, relativeFa, toman } from '../utils/format'
 import type { CustomerPart, PartServiceHistory } from '../types'
 
@@ -43,6 +44,7 @@ export default function CustomerDetail() {
   const { id } = useParams<{ id: string }>()
   const nav = useNavigate()
   const qc = useQueryClient()
+  const canViewSmsLogs = useAuthStore((s) => Boolean(s.user?.permissions?.includes('sms.logs')))
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('devices')
   const [editOpen, setEditOpen] = useState(false)
@@ -517,7 +519,7 @@ export default function CustomerDetail() {
                                 </div>
                               )}
 
-                              <Can permission="parts.history">
+                              <Can permission="parts.assign.edit">
                                 <button
                                   type="button"
                                   className="btn btn-ghost btn-xs btn-square text-error hover:bg-error/10"
@@ -569,7 +571,7 @@ export default function CustomerDetail() {
       )}
 
       {/* Tab 3: SMS Logs */}
-      {activeTab === 'sms' && (
+      {activeTab === 'sms' && canViewSmsLogs && (
         <div className="rounded-2xl border border-base-200 bg-base-100 p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-bold text-base text-base-content">پیامک‌های ارسال شده به این مشتری (ملی‌پیامک)</h2>
@@ -746,7 +748,7 @@ export default function CustomerDetail() {
         title="حذف دستگاه تخصیص‌یافته"
         message={`آیا از حذف «${deletingAssignment?.part?.name ?? 'این دستگاه'}» به تعداد ${num(
           deletingAssignment?.quantity ?? 1,
-        )} عدد از پرونده این مشتری اطمینان دارید؟ موجودی بلافاصله به انبار برگشت داده می‌شود و این عملیات قابل بازگشت نیست.`}
+        )} عدد از پرونده این مشتری اطمینان دارید؟ موجودی بلافاصله به انبار برگشت داده می‌شود و این عملیات قابل بازگشت نیست. اگر سابقه سرویس/تعمیر ثبت شده باشد، حذف انجام نمی‌شود.`}
         confirmText="بله، حذف و برگشت به انبار"
         tone="error"
         loading={deleteAssignmentMutation.isPending}

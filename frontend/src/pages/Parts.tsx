@@ -23,6 +23,8 @@ import { Field, TableSkeleton, EmptyState } from '../components/ui/Field'
 import { Can } from '../components/common/Can'
 import { StockMovementModal } from '../components/parts/StockMovementModal'
 import { partApi } from '../services/api'
+import { useDebouncedValue } from '../utils/useDebouncedValue'
+import { useAuthStore } from '../store/useAuthStore'
 import { cx, num, toEnDigits } from '../utils/format'
 import type { Part } from '../types'
 
@@ -39,7 +41,10 @@ const schema = z.object({
     .trim()
     .min(2, 'کد دستگاه (SKU) را وارد کنید')
     .regex(/^[a-zA-Z0-9\-_]+$/, 'کد SKU فقط می‌تواند شامل حروف انگلیسی، اعداد و خط تیره باشد'),
-  periodic_service_months: z.number().min(1, 'دوره سرویس باید حداقل ۱ ماه باشد'),
+  periodic_service_months: z
+    .number()
+    .min(1, 'دوره سرویس باید حداقل ۱ ماه باشد')
+    .max(120, 'دوره سرویس نمی‌تواند بیش از ۱۲۰ ماه باشد'),
   description: z.string().trim().optional(),
   is_active: z.boolean(),
   min_stock_quantity: z.number().min(0, 'حد هشدار نمی‌تواند منفی باشد'),
@@ -55,6 +60,7 @@ export default function Parts() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingPart, setEditingPart] = useState<Part | null>(null)
   const [deletingPart, setDeletingPart] = useState<Part | null>(null)
+  const canManageInventory = useAuthStore((s) => Boolean(s.user?.permissions?.includes('inventory.manage')))
   const [stockModalOpen, setStockModalOpen] = useState(false)
   const [stockPartId, setStockPartId] = useState<number | string | null>(null)
 
@@ -65,9 +71,11 @@ export default function Parts() {
     }
   }, [params])
 
+  const debouncedQ = useDebouncedValue(q, 300)
+
   const { data: parts = [], isLoading } = useQuery({
-    queryKey: ['parts-catalog', q],
-    queryFn: () => partApi.list({ q: q.trim() || undefined }),
+    queryKey: ['parts-catalog', debouncedQ],
+    queryFn: () => partApi.list({ q: debouncedQ.trim() || undefined }),
   })
 
   const {
@@ -246,7 +254,7 @@ export default function Parts() {
       {/* Devices Table */}
       <div className="overflow-hidden rounded-2xl border border-base-200 bg-base-100 shadow-xs">
         {isLoading ? (
-          <TableSkeleton rows={5} cols={6} />
+          <TableSkeleton rows={5} cols={7} />
         ) : !parts.length ? (
           <EmptyState
             title="دستگاهی یافت نشد"
@@ -442,6 +450,8 @@ export default function Parts() {
             <Field label="دوره پوشش گارانتی / سرویس (ماه)" required error={errors.periodic_service_months?.message}>
               <input
                 type="number"
+                min={1}
+                max={120}
                 dir="ltr"
                 className="input input-bordered w-full text-start"
                 placeholder="مثال: 6 یا 12"
@@ -453,13 +463,19 @@ export default function Parts() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field
               label={editingPart ? 'موجودی فعلی انبار' : 'موجودی اولیه انبار'}
-              hint={editingPart ? 'برای تغییر موجودی از فرم «ورود/خروج کالا» استفاده کنید.' : 'این مقدار به عنوان ورود اولیه در لاگ انبار ثبت می‌شود.'}
+              hint={
+                editingPart
+                  ? 'برای تغییر موجودی از فرم «ورود/خروج کالا» استفاده کنید.'
+                  : canManageInventory
+                    ? 'این مقدار به عنوان ورود اولیه در لاگ انبار ثبت می‌شود.'
+                    : 'ثبت موجودی اولیه نیازمند مجوز «مدیریت انبار» است.'
+              }
               error={errors.stock_quantity?.message}
             >
               <input
                 type="number"
                 dir="ltr"
-                disabled={Boolean(editingPart)}
+                disabled={Boolean(editingPart) || !canManageInventory}
                 className="input input-bordered w-full text-start disabled:bg-base-200"
                 placeholder="مثال: 20"
                 {...register('stock_quantity', { setValueAs: (v) => toNumber(v, 0) })}

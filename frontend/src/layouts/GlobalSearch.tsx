@@ -3,13 +3,24 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Cpu, Search, User, X } from 'lucide-react'
 import { customerApi, partApi } from '../services/api'
+import { useAuthStore } from '../store/useAuthStore'
 import { Avatar } from '../components/ui/Avatar'
 
 export function GlobalSearch() {
   const [q, setQ] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
   const [open, setOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const nav = useNavigate()
+  const hasPermission = useAuthStore((s) => s.hasPermission)
+  const canViewCustomers = hasPermission('customers.view')
+  const canViewParts = hasPermission('parts.view')
+
+  // جستجوی سراسری با هر کلید فوراً به سرور نمی‌رود؛ ۳۰۰ میلی‌ثانیه صبر می‌کنیم.
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchTerm(q.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [q])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -23,24 +34,22 @@ export function GlobalSearch() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const searchTerm = q.trim()
-
   const { data: customerData, isFetching: customersLoading } = useQuery({
     queryKey: ['global-search-customers', searchTerm],
     queryFn: () => customerApi.list({ q: searchTerm, per_page: 5 }),
-    enabled: searchTerm.length >= 2,
+    enabled: canViewCustomers && searchTerm.length >= 2,
     staleTime: 1000 * 30,
   })
 
   const { data: partsData = [], isFetching: partsLoading } = useQuery({
     queryKey: ['global-search-parts', searchTerm],
     queryFn: () => partApi.list({ q: searchTerm }),
-    enabled: searchTerm.length >= 2,
+    enabled: canViewParts && searchTerm.length >= 2,
     staleTime: 1000 * 30,
   })
 
-  const customers = customerData?.data || []
-  const parts = partsData.slice(0, 5)
+  const customers = canViewCustomers ? customerData?.data || [] : []
+  const parts = canViewParts ? partsData.slice(0, 5) : []
   const isLoading = customersLoading || partsLoading
 
   const go = (path: string) => {
@@ -51,6 +60,8 @@ export function GlobalSearch() {
 
   const hasSearched = searchTerm.length >= 2
   const empty = hasSearched && !isLoading && customers.length === 0 && parts.length === 0
+
+  if (!canViewCustomers && !canViewParts) return null
 
   return (
     <div className="relative w-full max-w-xs sm:max-w-sm lg:max-w-md min-w-0">

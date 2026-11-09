@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { Globe2, Search, ShieldCheck, User as UserIcon, Users, X } from 'lucide-react'
@@ -67,12 +67,21 @@ export function CustomerAccessEditor({ user }: CustomerAccessEditorProps) {
     enabled: isAdministrator && scope === 'custom' && search.trim().length >= 2,
   })
 
+  const initializedForUserRef = useRef<string | null>(null)
+
   useEffect(() => {
     if (!access) return
+
+    // فقط یک بار (یا هنگام تغییر کاربر) فرم را از سرور پر کن؛ refetch پس‌زمینه
+    // نباید تغییرات ذخیره‌نشده کاربر را پاک کند.
+    const userKey = String(user.id)
+    if (initializedForUserRef.current === userKey) return
+    initializedForUserRef.current = userKey
+
     setScope(access.scope ?? 'own')
     setStaffIds((access.staff_ids ?? []).map(Number))
     setCustomerIds((access.customer_ids ?? []).map(Number))
-  }, [access])
+  }, [access, user.id])
 
   // بازیابی اطلاعات نمایشی مشتریان انتخاب‌شده (بعد از رفرش صفحه)
   useEffect(() => {
@@ -139,7 +148,7 @@ export function CustomerAccessEditor({ user }: CustomerAccessEditorProps) {
     [staffOptions, user.id],
   )
 
-  const isRootAdmin = user.email === 'admin@crm.local'
+  const isRootAdmin = Number(user.id) === 1
 
   if (isRootAdmin) {
     return (

@@ -70,9 +70,9 @@ class CustomerController extends Controller
         $this->normalizeCustomerInput($request);
 
         $isCompany = $request->input('type', 'individual') === 'company';
-        $nationalCodeRule = $isCompany
-            ? 'nullable|string|regex:/^\d{11}$/'
-            : 'nullable|string|regex:/^\d{10}$/';
+        // ۱۰ یا ۱۱ رقم پذیرفته می‌شود تا پرونده‌های قدیمی (شناسه ملی ۱۰ رقمی) هنگام
+        // ویرایش قفل نشوند؛ فرم جدید همچنان ۱۱ رقم را پیشنهاد می‌دهد.
+        $nationalCodeRule = 'nullable|string|regex:/^\d{10,11}$/';
 
         $validated = $request->validate([
             'customer_type' => 'required|in:potential,effective',
@@ -82,7 +82,7 @@ class CustomerController extends Controller
             'company_name' => $isCompany ? 'required|string|max:150' : 'nullable|string|max:150',
             'national_code' => $nationalCodeRule,
             'mobile' => ['nullable', 'string', 'regex:/^09\d{9}$/'],
-            'phone' => ['nullable', 'string', 'regex:/^0\d{10}$/'],
+            'phone' => ['nullable', 'string', 'regex:/^0\d{7,10}$/'],
             'email' => 'nullable|email|max:150',
             'province' => 'nullable|string|max:50',
             'city' => 'nullable|string|max:50',
@@ -92,11 +92,9 @@ class CustomerController extends Controller
             'first_name.required' => 'برای شخص حقیقی وارد کردن نام الزامی است.',
             'last_name.required' => 'برای شخص حقیقی وارد کردن نام خانوادگی الزامی است.',
             'company_name.required' => 'برای شخص حقوقی وارد کردن نام شرکت الزامی است.',
-            'national_code.regex' => $isCompany
-                ? 'شناسه ملی شخص حقوقی باید دقیقاً ۱۱ رقم عددی باشد.'
-                : 'کد ملی شخص حقیقی باید دقیقاً ۱۰ رقم عددی باشد.',
+            'national_code.regex' => 'کد ملی / شناسه ملی باید ۱۰ یا ۱۱ رقم عددی باشد.',
             'mobile.regex' => 'شماره همراه باید ۱۱ رقم عددی بوده و با 09 شروع شود.',
-            'phone.regex' => 'شماره تلفن ثابت باید ۱۱ رقم عددی بوده و با 0 شروع شود (مانند 02188776655).',
+            'phone.regex' => 'شماره تلفن ثابت باید ۸ تا ۱۱ رقم عددی بوده و با 0 شروع شود (مانند 02188776655).',
         ]);
 
         $validated['created_by'] = $request->user()->id;
@@ -120,14 +118,20 @@ class CustomerController extends Controller
         $this->authorizePermission('customers.view');
         $this->access->authorizeView($request->user(), $customer);
 
-        $customer->load([
+        $relations = [
             'customerParts.part',
             'customerParts.assignedBy:id,name',
             'customerParts.serviceHistories.performedBy',
             'histories.user',
-            'smsLogs',
             'creator:id,name,user_type',
-        ]);
+        ];
+
+        // سوابق پیامک مجوز مستقل (sms.logs) دارد و نباید از مسیر پرونده مشتری افشا شود.
+        if ($request->user()?->hasPermissionTo('sms.logs')) {
+            $relations[] = 'smsLogs';
+        }
+
+        $customer->load($relations);
 
         return response()->json($customer);
     }
@@ -141,9 +145,7 @@ class CustomerController extends Controller
 
         $personType = $request->input('type', $customer->type);
         $isCompany = $personType === 'company';
-        $nationalCodeRule = $isCompany
-            ? 'nullable|string|regex:/^\d{11}$/'
-            : 'nullable|string|regex:/^\d{10}$/';
+        $nationalCodeRule = 'nullable|string|regex:/^\d{10,11}$/';
 
         $validated = $request->validate([
             'customer_type' => 'sometimes|in:potential,effective',
@@ -153,7 +155,7 @@ class CustomerController extends Controller
             'company_name' => $isCompany ? 'required|string|max:150' : 'nullable|string|max:150',
             'national_code' => $nationalCodeRule,
             'mobile' => ['nullable', 'string', 'regex:/^09\d{9}$/'],
-            'phone' => ['nullable', 'string', 'regex:/^0\d{10}$/'],
+            'phone' => ['nullable', 'string', 'regex:/^0\d{7,10}$/'],
             'email' => 'nullable|email|max:150',
             'province' => 'nullable|string|max:50',
             'city' => 'nullable|string|max:50',
@@ -163,11 +165,9 @@ class CustomerController extends Controller
             'first_name.required' => 'برای شخص حقیقی وارد کردن نام الزامی است.',
             'last_name.required' => 'برای شخص حقیقی وارد کردن نام خانوادگی الزامی است.',
             'company_name.required' => 'برای شخص حقوقی وارد کردن نام شرکت الزامی است.',
-            'national_code.regex' => $isCompany
-                ? 'شناسه ملی شخص حقوقی باید دقیقاً ۱۱ رقم عددی باشد.'
-                : 'کد ملی شخص حقیقی باید دقیقاً ۱۰ رقم عددی باشد.',
+            'national_code.regex' => 'کد ملی / شناسه ملی باید ۱۰ یا ۱۱ رقم عددی باشد.',
             'mobile.regex' => 'شماره همراه باید ۱۱ رقم عددی بوده و با 09 شروع شود.',
-            'phone.regex' => 'شماره تلفن ثابت باید ۱۱ رقم عددی بوده و با 0 شروع شود (مانند 02188776655).',
+            'phone.regex' => 'شماره تلفن ثابت باید ۸ تا ۱۱ رقم عددی بوده و با 0 شروع شود (مانند 02188776655).',
         ]);
 
         if (array_key_exists('mobile', $validated) && $validated['mobile'] === null) {
@@ -196,6 +196,17 @@ class CustomerController extends Controller
 
         $name = $customer->full_name;
 
+        // سوابق سرویس/تعمیر سند مالی و فنی هستند؛ حذف پرونده نباید آن‌ها را از بین ببرد.
+        $hasServiceHistory = $customer->customerParts()
+            ->whereHas('serviceHistories')
+            ->exists();
+
+        if ($hasServiceHistory) {
+            return response()->json([
+                'message' => "حذف پرونده «{$name}» ممکن نیست؛ برای این مشتری سابقه سرویس/تعمیر ثبت شده است.",
+            ], 422);
+        }
+
         // حذف امن: موجودی همه دستگاه‌های تخصیص‌یافته قبل از حذف به انبار برگردانده می‌شود.
         $this->customerService->deleteCustomer($customer, $request->user()->id);
 
@@ -215,9 +226,13 @@ class CustomerController extends Controller
             'file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
         ]);
 
+        $user = $request->user();
+        $hasFullAccess = $this->access->hasFullAccess($user);
+
         $import = new CustomersImport();
-        $import->setCreatorUserId($request->user()?->id);
-        $import->setCanUpdateAnyCustomer($this->access->hasFullAccess($request->user()));
+        $import->setCreatorUserId($user?->id);
+        $import->setCanUpdateAnyCustomer($hasFullAccess);
+        $import->setVisibleCustomerIds($hasFullAccess ? null : $this->access->visibleCustomerIds($user));
         Excel::import($import, $request->file('file'));
 
         return response()->json([
@@ -261,6 +276,8 @@ class CustomerController extends Controller
      */
     public function template()
     {
+        $this->authorizePermission('customers.import');
+
         return Excel::download(new CustomersTemplateExport(), 'customers-sample-template.xlsx');
     }
 
@@ -281,7 +298,17 @@ class CustomerController extends Controller
             fputcsv($handle, $headings);
 
             foreach ($rows as $row) {
-                fputcsv($handle, $export->map($row));
+                // جلوگیری از تزریق فرمول در CSV: هر سلول متنی که با = + - @ شروع شود
+                // با یک آپاستروف خنثی می‌شود (اعداد واقعی دست‌نخورده می‌مانند).
+                $cells = array_map(function ($value) {
+                    if (is_string($value) && preg_match('/^[=+\-@\t\r]/', $value)) {
+                        return "'" . $value;
+                    }
+
+                    return $value;
+                }, $export->map($row));
+
+                fputcsv($handle, $cells);
             }
 
             fclose($handle);

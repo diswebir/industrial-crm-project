@@ -17,6 +17,14 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        // داده‌های نمونه و رمز پیش‌فرض فقط برای توسعه/آزمایش است؛ در محیط تولید
+        // نباید اجرای تصادفی db:seed یک حساب با رمز عمومی بسازد.
+        if (app()->environment('production')) {
+            $this->command?->warn('DatabaseSeeder در محیط production غیرفعال است.');
+
+            return;
+        }
+
         // 1. Ensure Admin User
         $admin = User::firstOrCreate(
             ['email' => 'admin@crm.local'],

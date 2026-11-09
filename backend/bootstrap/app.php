@@ -15,6 +15,9 @@ $app = Application::configure(basePath: dirname(__DIR__))
         $middleware->api(prepend: [
             \App\Http\Middleware\AuthenticateFromCookie::class,
         ]);
+        $middleware->alias([
+            'active' => \App\Http\Middleware\EnsureUserIsActive::class,
+        ]);
         $middleware->validateCsrfTokens(except: [
             'api/*',
         ]);

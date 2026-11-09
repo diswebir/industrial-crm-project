@@ -4,7 +4,7 @@
 
 | مورد | مقدار |
 |---|---|
-| نسخه فعلی | **2.0.1** |
+| نسخه فعلی | **2.0.2** |
 | تاریخچه تغییرات | [`CHANGELOG.md`](CHANGELOG.md) |
 | راهنمای ارتقا روی cPanel | [`docs/upgrade-v2-cpanel.fa.md`](docs/upgrade-v2-cpanel.fa.md) |
 | چک‌لیست آزمون پذیرش | [`docs/PHASE3-ACCEPTANCE.fa.md`](docs/PHASE3-ACCEPTANCE.fa.md) |

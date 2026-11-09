@@ -37,9 +37,39 @@ class User extends Authenticatable implements FilamentUser
         'installer' => 'نصاب',
     ];
 
+    /**
+     * مدیر اصلی سامانه = حساب اول نصب (شناسه ۱). ایمیل ممکن است در نصب‌کننده
+     * به ایمیل مالک تغییر کند؛ بنابراین شناسه، معیار پایدار است.
+     */
+    public function isRootAdmin(): bool
+    {
+        return (int) $this->getKey() === 1;
+    }
+
     public function canAccessPanel(Panel $panel): bool
     {
-        return (bool) ($this->is_active && $this->isAdministrator() && ($this->email === 'admin@crm.local' || $this->can('users.manage')));
+        return (bool) ($this->is_active && $this->isAdministrator() && ($this->isRootAdmin() || $this->can('users.manage')));
+    }
+
+    protected static function booted(): void
+    {
+        // هر مسیری که کاربر را غیرفعال کند (API یا پنل) باید توکن‌های فعال او را باطل کند.
+        // نقش/وضعیت/دامنه مدیر اصلی در هیچ مسیری (API، پنل، پروفایل) قابل تغییر نیست.
+        // ایمیل در نصب‌کننده یک‌بار به ایمیل مالک تغییر می‌کند؛ محافظت با شناسه ۱
+        // باقی می‌ماند.
+        static::updating(function (User $user) {
+            if ((int) $user->getOriginal('id') === 1) {
+                $user->is_active = true;
+                $user->user_type = 'administrator';
+                $user->data_scope = 'all';
+            }
+        });
+
+        static::updated(function (User $user) {
+            if ($user->wasChanged('is_active') && ! $user->is_active) {
+                $user->tokens()->delete();
+            }
+        });
     }
 
     /**

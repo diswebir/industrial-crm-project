@@ -142,16 +142,17 @@ class CustomersExport implements FromCollection, WithHeadings, WithMapping, Shou
     }
 
     /**
-     * ستون‌های حساس (کد ملی، شماره تماس، کد دستگاه، سریال و شماره فاکتور) به صورت رشته ذخیره می‌شوند
-     * تا صفر ابتدایی یا حروف توسط Excel حذف/تبدیل نشود. سایر ستون‌ها (مبلغ، تعداد) عددی می‌مانند.
+     * فقط ستون‌های «تعداد» (S) و «مبلغ فاکتور» (U) عددی می‌مانند؛ بقیه رشته‌اند تا
+     * صفر ابتدایی حذف نشود و متن‌هایی مثل «=...» به فرمول Excel تبدیل نشوند
+     * (جلوگیری از Formula Injection در فایل خروجی).
      */
     public function bindValue(Cell $cell, $value)
     {
-        if (in_array($cell->getColumn(), ['F', 'G', 'H', 'Q', 'R', 'T'], true)) {
-            return (new StringValueBinder())->bindValue($cell, $value);
+        if (in_array($cell->getColumn(), ['S', 'U'], true)) {
+            return (new DefaultValueBinder())->bindValue($cell, $value);
         }
 
-        return (new DefaultValueBinder())->bindValue($cell, $value);
+        return (new StringValueBinder())->bindValue($cell, $value);
     }
 
     protected function deviceStatusLabel(string $status): string

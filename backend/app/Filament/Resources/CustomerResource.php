@@ -59,14 +59,26 @@ class CustomerResource extends Resource
                     ->maxLength(255),
                 Forms\Components\TextInput::make('national_code')
                     ->label('کد ملی / شناسه ملی')
-                    ->maxLength(20),
+                    ->maxLength(11)
+                    ->rules(['nullable', 'regex:/^\d{10,11}$/'])
+                    ->validationMessages([
+                        'regex' => 'کد ملی / شناسه ملی باید ۱۰ یا ۱۱ رقم عددی باشد.',
+                    ]),
                 Forms\Components\TextInput::make('mobile')
                     ->label('شماره همراه (اختیاری)')
-                    ->maxLength(20),
+                    ->maxLength(11)
+                    ->rules(['nullable', 'regex:/^09\d{9}$/'])
+                    ->validationMessages([
+                        'regex' => 'شماره همراه باید ۱۱ رقم و با 09 شروع شود.',
+                    ]),
                 Forms\Components\TextInput::make('phone')
                     ->label('تلفن ثابت')
                     ->tel()
-                    ->maxLength(20),
+                    ->maxLength(11)
+                    ->rules(['nullable', 'regex:/^0\d{7,10}$/'])
+                    ->validationMessages([
+                        'regex' => 'تلفن ثابت باید ۸ تا ۱۱ رقم و با 0 شروع شود.',
+                    ]),
                 Forms\Components\TextInput::make('email')
                     ->label('ایمیل')
                     ->email()
@@ -128,11 +140,9 @@ class CustomerResource extends Resource
             ->actions([
                 Tables\Actions\EditAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
-            ]);
+            // حذف گروهی از پنل مدیریت غیرفعال است: حذف مشتری/دستگاه باید از
+            // مسیر اصلی سامانه انجام شود تا موجودی انبار و تاریخچه حفظ شود.
+            ;
     }
 
     public static function getRelations(): array

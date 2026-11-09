@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import { Modal } from '../ui/Modal'
 import { Field } from '../ui/Field'
 import { DatePicker } from '../ui/DatePicker'
+import { num, todayIso } from '../../utils/format'
 import { partApi } from '../../services/api'
 import type { CustomerPart } from '../../types'
 
@@ -26,7 +27,7 @@ interface ServiceHistoryModalProps {
 }
 
 export function ServiceHistoryModal({ open, onClose, customerPart, onSuccess }: ServiceHistoryModalProps) {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = useMemo(() => todayIso(), [])
 
   const {
     register,
@@ -80,7 +81,7 @@ export function ServiceHistoryModal({ open, onClose, customerPart, onSuccess }: 
       open={open}
       onClose={onClose}
       size="md"
-      title={`ثبت سابقه اقدام/تعمیر برای سریال ${customerPart.serial_number}`}
+      title={`ثبت سابقه اقدام/تعمیر برای ${customerPart.serial_number ? `سریال ${customerPart.serial_number}` : `${customerPart.part?.name ?? 'دستگاه'} (${num(customerPart.quantity ?? 1)} عدد)`}`}
       footer={
         <>
           <button type="button" className="btn btn-ghost" onClick={onClose} disabled={isSubmitting}>

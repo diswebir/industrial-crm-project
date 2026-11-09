@@ -73,6 +73,8 @@ export default function UsersAclPage() {
     onSuccess: (res) => {
       toast.success(res.message)
       qc.invalidateQueries({ queryKey: ['system-users'] })
+      qc.invalidateQueries({ queryKey: ['system-user'] })
+      qc.invalidateQueries({ queryKey: ['user-customer-access'] })
       setPermModalUser(null)
     },
     onError: (err: any) => {

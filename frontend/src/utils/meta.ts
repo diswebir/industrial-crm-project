@@ -64,7 +64,7 @@ export const activityType: Record<ActivityType, { label: string }> = {
 }
 
 export const roleLabel: Record<string, string> = {
-  admin: 'مدیر سیستم', manager: 'سرپرست', sales: 'فروش', support: 'پشتیبانی',
+  admin: 'مدیر سیستم', manager: 'مدیر', sales: 'فروش', support: 'پشتیبانی',
   warehouse: 'انبار', finance: 'مالی', marketing: 'بازاریابی',
   administrator: 'مدیر ارشد', salesperson: 'کارمند فروش', installer: 'نصاب',
 }

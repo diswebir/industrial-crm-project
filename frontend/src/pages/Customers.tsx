@@ -27,6 +27,7 @@ import { CustomerFormModal } from '../components/customers/CustomerFormModal'
 import { ImportModal } from '../components/customers/ImportModal'
 import { Can } from '../components/common/Can'
 import { customerApi } from '../services/api'
+import { useDebouncedValue } from '../utils/useDebouncedValue'
 import { cx, dateShort, num } from '../utils/format'
 import type { Customer, CustomerType } from '../types'
 
@@ -81,12 +82,14 @@ export default function Customers() {
     }
   }, [params, setParams])
 
+  const debouncedQ = useDebouncedValue(q, 300)
+
   const { data, isLoading } = useQuery({
-    queryKey: ['customers', customerType, q, page],
+    queryKey: ['customers', customerType, debouncedQ, page],
     queryFn: () =>
       customerApi.list({
         customer_type: customerType === 'all' ? undefined : customerType,
-        q: q.trim() || undefined,
+        q: debouncedQ.trim() || undefined,
         page,
         per_page: PAGE_SIZE,
       }),
@@ -393,7 +396,7 @@ export default function Customers() {
         onClose={() => setDeleting(null)}
         onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
         title="حذف پرونده مشتری"
-        message={`آیا از حذف مشتری «${deleting?.full_name || `${deleting?.first_name ?? ''} ${deleting?.last_name ?? ''}`}» اطمینان دارید؟ تمام سوابق و دستگاه‌های تخصیص‌یافته به این مشتری نیز حذف و موجودی آن‌ها به انبار برگشت داده می‌شود.`}
+        message={`آیا از حذف مشتری «${deleting?.full_name || `${deleting?.first_name ?? ''} ${deleting?.last_name ?? ''}`}» اطمینان دارید؟ دستگاه‌های تخصیص‌یافته آزاد و موجودی آن‌ها به انبار برگشت داده می‌شود. اگر برای این مشتری سابقه سرویس/تعمیر ثبت شده باشد، حذف انجام نمی‌شود.`}
         confirmText="بله، حذف کن"
         tone="error"
         loading={deleteMutation.isPending}

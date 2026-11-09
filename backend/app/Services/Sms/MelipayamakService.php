@@ -28,12 +28,16 @@ class MelipayamakService
 
         $username = Setting::get('melipayamak_username') ?: env('MELIPAYAMAK_USERNAME');
         $password = Setting::get('melipayamak_password') ?: env('MELIPAYAMAK_PASSWORD');
-        $sandbox = Setting::get('melipayamak_sandbox', 'true') === 'true' || env('MELIPAYAMAK_SANDBOX', true);
+        $sandbox = $this->sandboxEnabled();
 
-        // If credentials are empty or sandbox mode is enabled, simulate dispatch
-        if ($sandbox || empty($username) || empty($password)) {
+        // فقط حالت سندباکسِ صریح، ارسال را شبیه‌سازی می‌کند. نبودِ اعتبارنامه در
+        // محیط واقعی باید خطا بدهد، نه اینکه پیامک «موفق» تلقی شود.
+        if ($sandbox) {
             $fakeMessageId = 'SANDBOX-' . rand(10000000, 99999999);
-            Log::info("Melipayamak Sandbox SMS to {$mobile} with Pattern {$bodyId}:", $tokens);
+            Log::info('Melipayamak sandbox pattern SMS', [
+                'mobile' => $this->maskMobile($mobile),
+                'body_id' => $bodyId,
+            ]);
 
             SmsLog::create([
                 'customer_id' => $customer?->id,
@@ -50,6 +54,17 @@ class MelipayamakService
                 'message_id' => $fakeMessageId,
                 'status' => 'پیامک در حالت آزمایشی (سندباکس) ثبت و ارسال فرضی شد',
                 'is_sandbox' => true,
+            ];
+        }
+
+        if (empty($username) || empty($password)) {
+            Log::warning('Melipayamak pattern SMS skipped: credentials are not configured.');
+
+            return [
+                'success' => false,
+                'message_id' => null,
+                'status' => 'اعتبارنامه ملی‌پیامک در تنظیمات سامانه وارد نشده است.',
+                'is_sandbox' => false,
             ];
         }
 
@@ -118,17 +133,22 @@ class MelipayamakService
         $username = Setting::get('melipayamak_username') ?: env('MELIPAYAMAK_USERNAME');
         $password = Setting::get('melipayamak_password') ?: env('MELIPAYAMAK_PASSWORD');
         $fromNumber = Setting::get('melipayamak_from') ?: env('MELIPAYAMAK_FROM', '5000...');
-        $sandbox = Setting::get('melipayamak_sandbox', 'true') === 'true' || env('MELIPAYAMAK_SANDBOX', true);
+        $sandbox = $this->sandboxEnabled();
 
-        // In sandbox mode or when credentials missing, log and simulate
-        if ($sandbox || empty($username) || empty($password)) {
+        // متن پیامک شامل کد یکبارمصرف است؛ هرگز نباید در لاگ برنامه یا لاگ پیامک
+        // به صورت خام ذخیره شود.
+        if ($sandbox) {
             $fakeMessageId = 'SANDBOX-OTP-' . rand(10000000, 99999999);
-            Log::info("Melipayamak Sandbox Normal SMS to {$mobile}: {$text}");
+            $safeText = $this->maskOtp($text);
+            Log::info('Melipayamak sandbox normal SMS', [
+                'mobile' => $this->maskMobile($mobile),
+                'text' => $safeText,
+            ]);
 
             SmsLog::create([
                 'recipient_mobile' => $mobile,
                 'pattern_code' => 'NORMAL-OTP',
-                'tokens' => ['text' => $text],
+                'tokens' => ['text' => $safeText],
                 'status' => 'sent',
                 'provider_message_id' => $fakeMessageId,
                 'error_message' => null,
@@ -139,6 +159,17 @@ class MelipayamakService
                 'message_id' => $fakeMessageId,
                 'status' => 'پیامک در حالت آزمایشی (سندباکس) ثبت و شبیه‌سازی شد',
                 'is_sandbox' => true,
+            ];
+        }
+
+        if (empty($username) || empty($password)) {
+            Log::warning('Melipayamak normal SMS skipped: credentials are not configured.');
+
+            return [
+                'success' => false,
+                'message_id' => null,
+                'status' => 'اعتبارنامه ملی‌پیامک در تنظیمات سامانه وارد نشده است.',
+                'is_sandbox' => false,
             ];
         }
 
@@ -162,7 +193,7 @@ class MelipayamakService
             SmsLog::create([
                 'recipient_mobile' => $mobile,
                 'pattern_code' => 'NORMAL-OTP',
-                'tokens' => ['text' => $text],
+                'tokens' => ['text' => $this->maskOtp($text)],
                 'status' => $isSuccess ? 'sent' : 'failed',
                 'provider_message_id' => $isSuccess ? (string)$val : null,
                 'error_message' => $isSuccess ? null : ($strStatus . ' (Code: ' . $val . ')'),
@@ -180,7 +211,7 @@ class MelipayamakService
             SmsLog::create([
                 'recipient_mobile' => $mobile,
                 'pattern_code' => 'NORMAL-OTP',
-                'tokens' => ['text' => $text],
+                'tokens' => ['text' => $this->maskOtp($text)],
                 'status' => 'failed',
                 'provider_message_id' => null,
                 'error_message' => $e->getMessage(),
@@ -193,6 +224,37 @@ class MelipayamakService
                 'is_sandbox' => false,
             ];
         }
+    }
+
+    /**
+     * حالت شبیه‌ساز باید صریحاً روشن شود. مقدار پیش‌فرض «خاموش» است تا در نصب
+     * تازه، پیامک واقعی ارسال شود و کد ورود هرگز در پاسخ HTTP افشا نشود.
+     */
+    private function sandboxEnabled(): bool
+    {
+        $setting = Setting::get('melipayamak_sandbox');
+
+        if ($setting !== null && $setting !== '') {
+            return filter_var($setting, FILTER_VALIDATE_BOOLEAN);
+        }
+
+        return filter_var(env('MELIPAYAMAK_SANDBOX', false), FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /** پنهان‌سازی کد یکبارمصرف در لاگ‌ها (حداقل چهار رقم متوالی). */
+    private function maskOtp(string $text): string
+    {
+        return (string) preg_replace('/\d{4,}/u', '••••', $text);
+    }
+
+    /** پنهان‌سازی بخش میانی شماره همراه در لاگ برنامه. */
+    private function maskMobile(string $mobile): string
+    {
+        if (strlen($mobile) < 8) {
+            return '••••';
+        }
+
+        return substr($mobile, 0, 4) . '•••' . substr($mobile, -3);
     }
 
     private function normalizeMobile(string $mobile): string

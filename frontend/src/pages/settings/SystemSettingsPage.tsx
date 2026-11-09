@@ -84,24 +84,6 @@ export default function SystemSettingsPage() {
     },
   })
 
-  // Remove logo mutation
-  const removeLogoMutation = useMutation({
-    mutationFn: () => {
-      const fd = new FormData()
-      fd.append('remove_logo', '1')
-      return settingsApi.updateCompanySettings(fd)
-    },
-    onSuccess: () => {
-      toast.success('لوگوی شرکت حذف شد.')
-      qc.invalidateQueries({ queryKey: ['company-settings'] })
-      setLogoFile(null)
-      setRemoveLogo(false)
-    },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.message || 'خطا در حذف لوگو')
-    },
-  })
-
   const handleSaveCompany = () => {
     const fd = new FormData()
     fd.append('company_name', companyName.trim())
@@ -164,13 +146,12 @@ export default function SystemSettingsPage() {
                 if (file) setRemoveLogo(false)
               }}
               onRemoveCurrentLogo={() => {
+                // حذف واقعی هنگام «ذخیره مشخصات شرکت» انجام می‌شود؛ قبلاً همان لحظه
+                // حذف می‌شد و سپس دوباره با ذخیره، درخواست تکراری ارسال می‌کرد.
                 setRemoveLogo(true)
                 setLogoFile(null)
-                if (companySettings?.company_logo_url) {
-                  removeLogoMutation.mutate()
-                }
               }}
-              disabled={saveCompanyMutation.isPending || removeLogoMutation.isPending}
+              disabled={saveCompanyMutation.isPending}
             />
 
             {/* Save button */}

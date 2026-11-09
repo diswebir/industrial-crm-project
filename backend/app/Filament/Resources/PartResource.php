@@ -9,6 +9,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class PartResource extends Resource
 {
@@ -65,6 +66,8 @@ class PartResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            // جلوگیری از N+1 در ستون «تخصیص‌یافته» (یک کوئری جمع برای همه ردیف‌ها).
+            ->modifyQueryUsing(fn (Builder $query) => $query->withSum('customerParts as allocated_quantity', 'quantity'))
             ->columns([
                 Tables\Columns\TextColumn::make('id')->label('شناسه')->sortable(),
                 Tables\Columns\TextColumn::make('name')
@@ -105,11 +108,9 @@ class PartResource extends Resource
             ->actions([
                 Tables\Actions\EditAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
-            ]);
+            // حذف گروهی از پنل مدیریت غیرفعال است: حذف مشتری/دستگاه باید از
+            // مسیر اصلی سامانه انجام شود تا موجودی انبار و تاریخچه حفظ شود.
+            ;
     }
 
     public static function getRelations(): array

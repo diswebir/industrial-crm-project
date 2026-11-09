@@ -15,11 +15,15 @@ Route::prefix('v1')->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:10,1')->name('login');
     Route::post('/auth/otp/send', [AuthController::class, 'sendOtp'])->middleware('throttle:5,1');
     Route::post('/auth/otp/verify', [AuthController::class, 'verifyOtp'])->middleware('throttle:10,1');
-    Route::get('/customers/template', [CustomerController::class, 'template']);
+
+    // Branding is public so the login page can render the company logo/name before authentication.
     Route::get('/settings/company', [SettingController::class, 'getCompanySettings']);
 
     // Protected API endpoints
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'active'])->group(function () {
+        // Downloadable Excel template is only for users who may import customers.
+        Route::get('/customers/template', [CustomerController::class, 'template']);
+
         // User profile & logout
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::match(['put', 'post'], '/auth/me', [AuthController::class, 'updateProfile']);
@@ -49,7 +53,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/inventory/movements', [InventoryController::class, 'store']);
 
         // SMS (Melipayamak)
-        Route::post('/sms/send-pattern', [SmsController::class, 'sendPattern']);
+        Route::post('/sms/send-pattern', [SmsController::class, 'sendPattern'])->middleware('throttle:20,1');
         Route::get('/sms/logs', [SmsController::class, 'logs']);
 
         // System Settings

@@ -20,7 +20,9 @@ import {
 import { PageHeader } from '../components/ui/PageHeader'
 import { Field, TableSkeleton, EmptyState } from '../components/ui/Field'
 import { Can } from '../components/common/Can'
+import AccessDenied from './AccessDenied'
 import { smsApi, settingsApi } from '../services/api'
+import { useAuthStore } from '../store/useAuthStore'
 import { cx, dateShort, dateTimeFa, num, relativeFa } from '../utils/format'
 
 const schema = z.object({
@@ -34,6 +36,10 @@ type SmsFormValues = z.infer<typeof schema>
 export default function SmsCenter() {
   const [params] = useSearchParams()
   const qc = useQueryClient()
+  const hasPermission = useAuthStore((s) => s.hasPermission)
+  const canSend = hasPermission('sms.send')
+  const canViewLogs = hasPermission('sms.logs')
+  const canViewSettings = hasPermission('settings.manage')
 
   // Dynamic tokens for pattern
   const [tokens, setTokens] = useState<Array<{ key: string; value: string }>>([
@@ -67,16 +73,24 @@ export default function SmsCenter() {
   const { data: smsSettings } = useQuery({
     queryKey: ['sms-settings'],
     queryFn: settingsApi.getSmsSettings,
+    enabled: canViewSettings,
   })
 
-  // Get SMS logs
+  // Get SMS logs (درخواست فقط با مجوز sms.logs ارسال می‌شود؛ قبلاً برای همه ۴۰۳ می‌گرفت)
   const { data: logsData, isLoading: logsLoading } = useQuery({
     queryKey: ['sms-logs'],
     queryFn: () => smsApi.getLogs(),
+    enabled: canViewLogs,
   })
 
   const addTokenRow = () => {
-    setTokens((prev) => [...prev, { key: `${prev.length}`, value: '' }])
+    setTokens((prev) => {
+      // کلید بعدی باید یکتا باشد؛ پس از حذف یک ردیف، prev.length ممکن است
+      // کلید تکراری بسازد و مقدار توکن قبلی را بازنویسی کند.
+      let next = 0
+      while (prev.some((t) => t.key === String(next))) next += 1
+      return [...prev, { key: String(next), value: '' }]
+    })
   }
 
   const removeTokenRow = (index: number) => {
@@ -94,11 +108,21 @@ export default function SmsCenter() {
   const onSubmit = async (values: SmsFormValues) => {
     // Build tokens object
     const tokenPayload: Record<string, string> = {}
-    tokens.forEach((t, i) => {
-      if (t.value.trim()) {
-        tokenPayload[t.key || String(i)] = t.value.trim()
+    const usedKeys = new Set<string>()
+
+    for (let i = 0; i < tokens.length; i += 1) {
+      const token = tokens[i]
+      if (!token.value.trim()) continue
+      const key = token.key || String(i)
+
+      if (usedKeys.has(key)) {
+        toast.error(`کلید متغیر «${key}» تکراری است؛ برای هر متغیر یک شماره یکتا وارد کنید.`)
+        return
       }
-    })
+
+      usedKeys.add(key)
+      tokenPayload[key] = token.value.trim()
+    }
 
     try {
       const res = await smsApi.sendPattern({
@@ -122,6 +146,10 @@ export default function SmsCenter() {
   }
 
   const logs = logsData?.data ?? []
+
+  if (!canSend && !canViewLogs) {
+    return <AccessDenied requiredPermission="sms.send یا sms.logs" />;
+  }
 
   return (
     <div className="space-y-6">
@@ -149,7 +177,8 @@ export default function SmsCenter() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Send Pattern SMS Form Card */}
-        <div className="lg:col-span-5 rounded-2xl border border-base-200 bg-base-100 p-5 shadow-xs space-y-4">
+        {canSend && (
+        <div className={cx('rounded-2xl border border-base-200 bg-base-100 p-5 shadow-xs space-y-4', canViewLogs ? 'lg:col-span-5' : 'lg:col-span-12')}>
           <div className="pb-3 border-b border-base-200">
             <h3 className="font-bold text-base text-base-content flex items-center gap-2">
               <Send className="size-4 text-primary" /> ارسال پیامک با الگو
@@ -235,9 +264,11 @@ export default function SmsCenter() {
             </Can>
           </form>
         </div>
+        )}
 
         {/* SMS Logs Table Card */}
-        <div className="lg:col-span-7 rounded-2xl border border-base-200 bg-base-100 p-5 shadow-xs space-y-4">
+        {canViewLogs && (
+        <div className={cx('rounded-2xl border border-base-200 bg-base-100 p-5 shadow-xs space-y-4', canSend ? 'lg:col-span-7' : 'lg:col-span-12')}>
           <div className="flex items-center justify-between pb-3 border-b border-base-200">
             <div>
               <h3 className="font-bold text-base text-base-content flex items-center gap-2">
@@ -247,7 +278,7 @@ export default function SmsCenter() {
                 وضعیت تحویل و کدهای پیگیری ارسال‌های ملی‌پیامک
               </p>
             </div>
-            <span className="badge badge-sm bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 text-xs">{num(logs.length)} رکورد</span>
+            <span className="badge badge-sm bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 text-xs">{num(logsData?.total ?? logs.length)} رکورد</span>
           </div>
 
           {logsLoading ? (
@@ -334,6 +365,7 @@ export default function SmsCenter() {
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   )

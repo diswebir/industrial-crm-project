@@ -61,19 +61,27 @@ class PartController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:150',
             'code' => ['required', 'string', 'max:50', 'regex:/^[A-Za-z0-9\-_]+$/', 'unique:parts,code'],
-            'periodic_service_months' => 'required|integer|min:1',
+            'periodic_service_months' => 'required|integer|min:1|max:120',
             'description' => 'nullable|string',
             'is_active' => 'boolean',
-            'stock_quantity' => 'nullable|integer|min:0',
-            'min_stock_quantity' => 'nullable|integer|min:0',
+            'stock_quantity' => 'nullable|integer|min:0|max:100000000',
+            'min_stock_quantity' => 'nullable|integer|min:0|max:100000000',
         ], [
             'code.regex' => 'کد دستگاه (SKU) فقط می‌تواند شامل حروف انگلیسی، اعداد و خط تیره باشد.',
             'code.unique' => 'این کد دستگاه قبلاً در سیستم ثبت شده است.',
             'stock_quantity.min' => 'موجودی اولیه نمی‌تواند منفی باشد.',
+            'periodic_service_months.max' => 'دوره سرویس نمی‌تواند بیش از ۱۲۰ ماه باشد.',
         ]);
 
         $initialStock = (int) ($validated['stock_quantity'] ?? 0);
         unset($validated['stock_quantity']);
+
+        // ثبت موجودی اولیه هم یک تراکنش انبار است و بدون مجوز انبار مجاز نیست.
+        if ($initialStock > 0 && ! $request->user()?->hasPermissionTo('inventory.manage')) {
+            return response()->json([
+                'message' => 'ثبت موجودی اولیه نیازمند مجوز «مدیریت انبار» است.',
+            ], 403);
+        }
 
         $part = DB::transaction(function () use ($validated, $initialStock, $request) {
             $part = Part::create(array_merge($validated, [
@@ -116,7 +124,31 @@ class PartController extends Controller
             ->values();
 
         $part->setRelation('customerParts', $assignments);
-        $part->load(['inventoryLogs.user', 'inventoryLogs.customer']);
+
+        // لاگ‌های انبار فقط با مجوز انبار و با رعایت دامنه دسترسی مشتری قابل مشاهده‌اند؛
+        // در غیر این صورت نام/شماره مشتریان سایر کارشناسان از این مسیر افشا می‌شد.
+        if ($user?->hasPermissionTo('inventory.view')) {
+            $part->load([
+                'inventoryLogs' => function ($query) use ($user) {
+                    $query->with([
+                        'user:id,name',
+                        'customer:id,first_name,last_name,company_name,type,mobile,created_by',
+                    ]);
+
+                    if (! $this->access->hasFullAccess($user)) {
+                        $visibleIds = $this->access->visibleCustomerIds($user);
+                        $query->where(function ($q) use ($visibleIds) {
+                            $q->whereNull('customer_id');
+                            if (! empty($visibleIds)) {
+                                $q->orWhereIn('customer_id', $visibleIds);
+                            }
+                        });
+                    }
+                },
+            ]);
+        } else {
+            $part->unsetRelation('inventoryLogs');
+        }
 
         return response()->json($part);
     }
@@ -128,15 +160,16 @@ class PartController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|string|max:150',
             'code' => ['sometimes', 'string', 'max:50', 'regex:/^[A-Za-z0-9\-_]+$/', Rule::unique('parts', 'code')->ignore($part->id)],
-            'periodic_service_months' => 'sometimes|integer|min:1',
+            'periodic_service_months' => 'sometimes|integer|min:1|max:120',
             'description' => 'nullable|string',
             'is_active' => 'boolean',
-            'stock_quantity' => 'nullable|integer|min:0',
-            'min_stock_quantity' => 'nullable|integer|min:0',
+            'stock_quantity' => 'nullable|integer|min:0|max:100000000',
+            'min_stock_quantity' => 'nullable|integer|min:0|max:100000000',
         ], [
             'code.regex' => 'کد دستگاه (SKU) فقط می‌تواند شامل حروف انگلیسی، اعداد و خط تیره باشد.',
             'code.unique' => 'این کد دستگاه قبلاً در سیستم ثبت شده است.',
             'stock_quantity.min' => 'موجودی نمی‌تواند منفی باشد.',
+            'periodic_service_months.max' => 'دوره سرویس نمی‌تواند بیش از ۱۲۰ ماه باشد.',
         ]);
 
         $newStock = array_key_exists('stock_quantity', $validated) ? (int) $validated['stock_quantity'] : null;
@@ -233,6 +266,12 @@ class PartController extends Controller
 
         $part = Part::findOrFail($validated['part_id']);
 
+        if (! $part->is_active) {
+            return response()->json([
+                'message' => 'این مدل دستگاه در کاتالوگ غیرفعال است و قابل تخصیص نیست.',
+            ], 422);
+        }
+
         $customerPart = $this->customerService->assignDevice(
             $customer,
             $part,
@@ -263,6 +302,15 @@ class PartController extends Controller
         $this->access->authorizeEdit($request->user(), $customer);
 
         $this->normalizeAssignmentInput($request);
+
+        if ($request->filled('part_id') && (int) $request->input('part_id') !== (int) $customerPart->part_id) {
+            $newPart = Part::find($request->input('part_id'));
+            if ($newPart && ! $newPart->is_active) {
+                return response()->json([
+                    'message' => 'مدل دستگاه جدید در کاتالوگ غیرفعال است و قابل تخصیص نیست.',
+                ], 422);
+            }
+        }
 
         $validated = $request->validate([
             'part_id' => 'sometimes|exists:parts,id',
@@ -304,6 +352,14 @@ class PartController extends Controller
         }
 
         $this->access->authorizeEdit($request->user(), $customer);
+
+        // سوابق سرویس/هزینه با حذف تخصیص cascade می‌شوند؛ تا وقتی سابقه وجود دارد
+        // حذف تخصیص مجاز نیست تا سند مالی/فنی از بین نرود.
+        if ($customerPart->serviceHistories()->exists()) {
+            return response()->json([
+                'message' => 'این دستگاه سابقه سرویس/تعمیر دارد. ابتدا سوابق سرویس آن را (در صورت مجاز بودن) حذف کنید.',
+            ], 422);
+        }
 
         $partName = $customerPart->part?->name ?? 'دستگاه';
         $quantity = (int) $customerPart->quantity;
@@ -362,7 +418,10 @@ class PartController extends Controller
         CustomerPart $customerPart,
         PartServiceHistory $history
     ): JsonResponse {
+        // حذف سند سرویس/هزینه عملیات حساس‌تری از ثبت آن است؛ نصاب‌ها (که فقط
+        // parts.history دارند) نباید بتوانند سوابق مالی را پاک کنند.
         $this->authorizePermission('parts.history');
+        $this->authorizePermission('parts.assign.edit');
 
         $customer = $customerPart->customer;
         if (! $customer) {

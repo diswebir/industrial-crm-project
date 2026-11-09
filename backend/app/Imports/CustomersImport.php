@@ -16,6 +16,9 @@ class CustomersImport implements ToModel, WithHeadingRow, SkipsEmptyRows
     /** آیا کاربر مجاز است پرونده مشتریان سایر کارشناسان را به‌روزرسانی کند؟ */
     private bool $canUpdateAnyCustomer = true;
 
+    /** شناسه مشتریان قابل مشاهده برای کاربر محدود؛ null = دسترسی کامل. */
+    private ?array $visibleCustomerIds = null;
+
     /** ثبت‌کننده مشتریان واردشده (مالکیت پرونده برای RBAC). */
     public function setCreatorUserId(?int $userId): void
     {
@@ -29,6 +32,14 @@ class CustomersImport implements ToModel, WithHeadingRow, SkipsEmptyRows
     public function setCanUpdateAnyCustomer(bool $canUpdateAny): void
     {
         $this->canUpdateAnyCustomer = $canUpdateAny;
+    }
+
+    /**
+     * @param  int[]|null  $customerIds  null یعنی کاربر دسترسی کامل دارد.
+     */
+    public function setVisibleCustomerIds(?array $customerIds): void
+    {
+        $this->visibleCustomerIds = $customerIds;
     }
 
     public function model(array $row)
@@ -70,6 +81,24 @@ class CustomersImport implements ToModel, WithHeadingRow, SkipsEmptyRows
             return null;
         }
 
+        // تلفن ثابت هم مانند فرم سامانه اعتبارسنجی می‌شود تا داده معیوب وارد نشود.
+        if ($phone !== '' && ! preg_match('/^0\d{7,10}$/', $phone)) {
+            $this->errors[] = "تلفن ثابت «{$phone}» نامعتبر است (نام: {$firstName} {$lastName})";
+            return null;
+        }
+
+        // کد ملی حقیقی = ۱۰ رقم، شناسه ملی حقوقی = ۱۱ رقم. برای سازگاری با
+        // پرونده‌های قدیمی، هر دو طول پذیرفته می‌شوند اما طول‌های دیگر رد می‌شوند.
+        if ($nationalCode !== '' && ! in_array(strlen($nationalCode), [10, 11], true)) {
+            $this->errors[] = "کد/شناسه ملی «{$nationalCode}» باید ۱۰ یا ۱۱ رقم باشد (نام: {$firstName} {$lastName})";
+            return null;
+        }
+
+        $emailIsValid = $email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
+        if ($email !== '' && ! $emailIsValid) {
+            $this->errors[] = "ایمیل «{$email}» نامعتبر است و خالی ثبت شد (نام: {$firstName} {$lastName})";
+        }
+
         // Determine customer type
         $customerType = 'potential';
         if (str_contains($customerTypeRaw, 'بالفعل') || strtolower($customerTypeRaw) === 'effective') {
@@ -90,15 +119,17 @@ class CustomersImport implements ToModel, WithHeadingRow, SkipsEmptyRows
 
         $existing = Customer::where($matchKey)->first();
 
-        if (
-            $existing
-            && ! $this->canUpdateAnyCustomer
-            && $this->creatorUserId
-            && $existing->created_by !== null
-            && (int) $existing->created_by !== (int) $this->creatorUserId
-        ) {
-            $this->errors[] = "سطر مربوط به مشتری «{$existing->full_name}» متعلق به کارشناس دیگری است و به‌روزرسانی نشد.";
-            return null;
+        if ($existing && ! $this->canUpdateAnyCustomer) {
+            $canSeeExisting = $this->visibleCustomerIds !== null
+                ? in_array((int) $existing->id, $this->visibleCustomerIds, true)
+                : ($existing->created_by !== null
+                    && $this->creatorUserId !== null
+                    && (int) $existing->created_by === (int) $this->creatorUserId);
+
+            if (! $canSeeExisting) {
+                $this->errors[] = "سطر مربوط به مشتری «{$existing->full_name}» خارج از دامنه دسترسی شماست و به‌روزرسانی نشد.";
+                return null;
+            }
         }
 
         $this->importedCount++;
@@ -112,7 +143,7 @@ class CustomersImport implements ToModel, WithHeadingRow, SkipsEmptyRows
             'national_code' => $nationalCode ?: null,
             'mobile' => $mobile ?: null,
             'phone' => $phone ?: null,
-            'email' => filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : null,
+            'email' => $emailIsValid ? $email : null,
             'province' => $province ?: null,
             'city' => $city ?: null,
             'address' => $address ?: null,
@@ -145,14 +176,28 @@ class CustomersImport implements ToModel, WithHeadingRow, SkipsEmptyRows
 
     private function getValue(array $row, array $keys): string
     {
+        $cleaned = [];
         foreach ($row as $k => $v) {
-            $cleanedKey = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', (string)$k));
-            foreach ($keys as $candidate) {
-                if ($cleanedKey === $candidate || str_contains($cleanedKey, $candidate)) {
-                    return trim((string)$v);
+            $cleanedKey = strtolower((string) preg_replace('/[^a-zA-Z0-9_]/', '', (string) $k));
+            $cleaned[$cleanedKey] = trim((string) $v);
+        }
+
+        // ابتدا تطبیق دقیق؛ تطبیق جزئی (contains) فقط در مرحله دوم انجام می‌شود تا
+        // ستون «نام شرکت» با ستون «نام» اشتباه گرفته نشود.
+        foreach ($keys as $candidate) {
+            if (array_key_exists($candidate, $cleaned)) {
+                return $cleaned[$candidate];
+            }
+        }
+
+        foreach ($keys as $candidate) {
+            foreach ($cleaned as $cleanedKey => $value) {
+                if (str_contains($cleanedKey, $candidate)) {
+                    return $value;
                 }
             }
         }
+
         return '';
     }
 

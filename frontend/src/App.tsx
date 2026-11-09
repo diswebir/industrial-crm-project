@@ -74,14 +74,9 @@ export default function App() {
                 </PermissionRoute>
               }
             />
-            <Route
-              path="sms"
-              element={
-                <PermissionRoute permission="sms.send">
-                  <SmsCenter />
-                </PermissionRoute>
-              }
-            />
+            {/* ارسال پیامک (sms.send) و مشاهده سوابق (sms.logs) هر کدام مستقل‌اند؛
+                محافظت نهایی داخل خود صفحه انجام می‌شود. */}
+            <Route path="sms" element={<SmsCenter />} />
 
             {/* Separated Settings Pages - Redirect root settings to sms */}
             <Route path="settings" element={<Navigate to="/settings/sms" replace />} />
@@ -118,14 +113,8 @@ export default function App() {
               }
             />
             <Route path="settings/profile" element={<MyProfilePage />} />
-            <Route
-              path="settings/system"
-              element={
-                <PermissionRoute permission="settings.manage">
-                  <SystemSettingsPage />
-                </PermissionRoute>
-              }
-            />
+            {/* تم/رنگ برای همه کاربران مجاز است؛ بخش برندینگ داخل صفحه فقط به مدیر ارشد نشان داده می‌شود. */}
+            <Route path="settings/system" element={<SystemSettingsPage />} />
             <Route path="profile" element={<Navigate to="/settings/profile" replace />} />
 
             <Route path="403" element={<AccessDenied />} />

@@ -1,6 +1,7 @@
 import { Suspense, useState } from 'react'
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { useQueryClient } from '@tanstack/react-query'
 import { LogOut, Menu, MessageSquare, Moon, Palette, ShieldCheck, Sun, User } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Sidebar } from './Sidebar'
@@ -46,6 +47,7 @@ function ThemeToggle() {
 function UserMenu() {
   const user = useAuthStore((s) => s.user)!
   const logout = useAuthStore((s) => s.logout)
+  const queryClient = useQueryClient()
   const hasPermission = useAuthStore((s) => s.hasPermission)
   const nav = useNavigate()
 
@@ -59,7 +61,7 @@ function UserMenu() {
       >
         <span className="hidden text-end leading-tight whitespace-nowrap lg:block">
           <span className="block text-xs font-bold truncate max-w-[110px] xl:max-w-[150px]">{user.name}</span>
-          <span className="block text-[10px] text-base-content/60 truncate max-w-[110px] xl:max-w-[150px]">{roleLabel[user.role || 'admin']}</span>
+          <span className="block text-[10px] text-base-content/60 truncate max-w-[110px] xl:max-w-[150px]">{user.user_type_label || (user.user_type ? roleLabel[user.user_type] : null) || 'کاربر سامانه'}</span>
         </span>
         <Avatar name={user.name} src={user.avatar_url} size="md" presence="online" />
       </div>
@@ -99,6 +101,8 @@ function UserMenu() {
             onClick={() => {
               closeDropdown()
               logout()
+              // داده‌های کاربر قبلی نباید در حافظه React Query باقی بمانند.
+              queryClient.clear()
               toast.success('با موفقیت از سیستم خارج شدید')
               nav('/login', { replace: true })
             }}

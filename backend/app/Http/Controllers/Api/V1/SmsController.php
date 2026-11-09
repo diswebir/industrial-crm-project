@@ -25,11 +25,17 @@ class SmsController extends Controller
     {
         $this->authorizePermission('sms.send');
 
+        $request->merge(['mobile' => $this->normalizePhoneNumber($request->input('mobile'))]);
+
         $validated = $request->validate([
             'mobile' => 'required|string|regex:/^09\d{9}$/',
-            'pattern_code' => 'required|string',
-            'tokens' => 'required|array',
+            'pattern_code' => 'required|string|max:100',
+            'tokens' => 'required|array|max:10',
+            'tokens.*' => 'nullable|string|max:200',
             'customer_id' => 'nullable|exists:customers,id',
+        ], [
+            'tokens.max' => 'حداکثر ۱۰ مقدار برای الگوی پیامک مجاز است.',
+            'tokens.*.max' => 'هر مقدار الگو حداکثر ۲۰۰ کاراکتر است.',
         ]);
 
         $customer = isset($validated['customer_id'])
@@ -39,6 +45,15 @@ class SmsController extends Controller
         // جلوگیری از ارسال پیامک به مشتری خارج از دامنه دسترسی کاربر (تسک ۱).
         if ($customer) {
             $this->access->authorizeView($request->user(), $customer);
+        } else {
+            // حتی وقتی customer_id ارسال نشده، اگر شماره مقصد متعلق به مشتریِ
+            // خارج از دامنه باشد نباید از این مسیر قابل پیامک باشد.
+            $mobileCustomers = Customer::where('mobile', $validated['mobile'])->get();
+
+            if ($mobileCustomers->isNotEmpty()
+                && ! $mobileCustomers->contains(fn (Customer $c) => $this->access->canView($request->user(), $c))) {
+                abort(403, 'این شماره همراه متعلق به مشتری خارج از دامنه دسترسی شماست.');
+            }
         }
 
         $result = $this->melipayamakService->sendPattern(
@@ -91,7 +106,7 @@ class SmsController extends Controller
             });
         }
 
-        $perPage = (int) $request->input('per_page', 20);
+        $perPage = max(1, min(100, (int) $request->input('per_page', 20)));
         $logs = $query->paginate($perPage);
 
         return response()->json($logs);

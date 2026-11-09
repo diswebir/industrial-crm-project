@@ -44,7 +44,9 @@ http.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401 && !window.location.pathname.includes('/login')) {
-      window.location.href = '/login'
+      // مسیر فعلی را نگه می‌داریم تا پس از ورود دوباره به همان صفحه برگردیم.
+      const from = `${window.location.pathname}${window.location.search}`
+      window.location.href = `/login?from=${encodeURIComponent(from)}`
     }
     return Promise.reject(err)
   },
@@ -58,7 +60,7 @@ export const authApi = {
     return data as { user: User; token?: string }
   },
   sendOtp: async (phone: string) => {
-    const { data } = await http.post<{ message: string; expires_in: number; sandbox_code?: string }>('/auth/otp/send', { phone })
+    const { data } = await http.post<{ message: string; expires_in: number; sandbox?: boolean }>('/auth/otp/send', { phone })
     return data
   },
   verifyOtp: async (phone: string, code: string) => {

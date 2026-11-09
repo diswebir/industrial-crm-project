@@ -20,6 +20,8 @@ class AuthController extends Controller
      */
     public function sendOtp(Request $request): JsonResponse
     {
+        $request->merge(['phone' => $this->normalizePhoneNumber($request->input('phone'))]);
+
         $validated = $request->validate([
             'phone' => ['required', 'string', 'regex:/^09\d{9}$/'],
         ], [
@@ -53,11 +55,23 @@ class AuthController extends Controller
         // Generate 5-digit OTP
         $otpCode = strval(random_int(10000, 99999));
         \Illuminate\Support\Facades\Cache::put('otp_' . $phone, $otpCode, now()->addMinutes(2));
+        \Illuminate\Support\Facades\Cache::put('otp_attempts_' . $phone, 0, now()->addMinutes(2));
         \Illuminate\Support\Facades\Cache::put($cooldownKey, true, now()->addSeconds(60));
 
         // Send normal SMS via Melipayamak
         $smsText = "کد تأیید ورود شما به سامانه مدیریت ارتباط با مشتری: {$otpCode}\nاعتبار: ۲ دقیقه";
         $smsResult = $this->melipayamakService->sendNormalSms($phone, $smsText);
+
+        if (empty($smsResult['success'])) {
+            // کد ذخیره‌شده بدون ارسال پیامک بی‌فایده است و نباید معتبر بماند.
+            \Illuminate\Support\Facades\Cache::forget('otp_' . $phone);
+            \Illuminate\Support\Facades\Cache::forget('otp_attempts_' . $phone);
+            \Illuminate\Support\Facades\Cache::forget($cooldownKey);
+
+            return response()->json([
+                'message' => 'ارسال پیامک تأیید ناموفق بود. لطفاً دوباره تلاش کنید یا با مدیر سیستم تماس بگیرید.',
+            ], 503);
+        }
 
         $response = [
             'message' => 'کد تأیید ورود با موفقیت به شماره شما پیامک شد.',
@@ -65,8 +79,10 @@ class AuthController extends Controller
         ];
 
         if (!empty($smsResult['is_sandbox'])) {
-            $response['sandbox_code'] = $otpCode;
-            $response['message'] = "پیامک در حالت شبیه‌ساز (Sandbox) ثبت شد. کد ورود: {$otpCode}";
+            // هرگز کد یکبارمصرف را در پاسخ HTTP برنگردان؛ در غیر این صورت هر کسی
+            // که شماره همراه یک کاربر را بداند می‌تواند بدون دسترسی به پیامک وارد شود.
+            $response['sandbox'] = true;
+            $response['message'] = 'درگاه پیامک در حالت شبیه‌ساز است و پیامکی ارسال نشد. برای دریافت کد با مدیر سیستم تماس بگیرید.';
         }
 
         return response()->json($response);
@@ -77,6 +93,8 @@ class AuthController extends Controller
      */
     public function verifyOtp(Request $request): JsonResponse
     {
+        $request->merge(['phone' => $this->normalizePhoneNumber($request->input('phone'))]);
+
         $validated = $request->validate([
             'phone' => ['required', 'string', 'regex:/^09\d{9}$/'],
             'code' => ['required', 'string'],
@@ -88,15 +106,28 @@ class AuthController extends Controller
         $phone = $validated['phone'];
         $code = trim($validated['code']);
 
+        $attemptKey = 'otp_attempts_' . $phone;
+        $attempts = (int) \Illuminate\Support\Facades\Cache::get($attemptKey, 0);
+
+        if ($attempts >= 5) {
+            \Illuminate\Support\Facades\Cache::forget('otp_' . $phone);
+            throw ValidationException::withMessages([
+                'code' => ['تعداد تلاش‌های ناموفق بیش از حد مجاز است. لطفاً کد جدید دریافت کنید.'],
+            ]);
+        }
+
         $cachedCode = \Illuminate\Support\Facades\Cache::get('otp_' . $phone);
 
-        if (!$cachedCode || $cachedCode !== $code) {
+        if (!$cachedCode || !hash_equals((string) $cachedCode, $code)) {
+            \Illuminate\Support\Facades\Cache::put($attemptKey, $attempts + 1, now()->addMinutes(2));
+
             throw ValidationException::withMessages([
                 'code' => ['کد تأیید وارد شده نامعتبر است یا منقضی گردیده است.'],
             ]);
         }
 
         \Illuminate\Support\Facades\Cache::forget('otp_' . $phone);
+        \Illuminate\Support\Facades\Cache::forget($attemptKey);
 
         $user = User::where('phone', $phone)->firstOrFail();
 
@@ -105,6 +136,10 @@ class AuthController extends Controller
                 'message' => 'حساب کاربری شما غیرفعال شده است.',
             ], 403);
         }
+
+        // توکن‌های قدیمیِ این کاربر را پاک‌سازی کن تا جدول personal_access_tokens
+        // به‌طور نامحدود رشد نکند.
+        $user->tokens()->where('created_at', '<', now()->subDays(30))->delete();
 
         $token = $user->createToken('api-token')->plainTextToken;
         $permissions = $user->getAllPermissions()->pluck('name')->values()->all();
@@ -138,9 +173,13 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        $loginField = filter_var($validated['login'], FILTER_VALIDATE_EMAIL) ? 'email' : 'phone';
+        $login = trim((string) $validated['login']);
+        $loginField = filter_var($login, FILTER_VALIDATE_EMAIL) ? 'email' : 'phone';
+        $loginValue = $loginField === 'email'
+            ? mb_strtolower($login)
+            : ($this->normalizePhoneNumber($login) ?? $login);
 
-        $user = User::where($loginField, $validated['login'])->first();
+        $user = User::where($loginField, $loginValue)->first();
 
         if (!$user || !Hash::check($validated['password'], $user->password)) {
             throw ValidationException::withMessages([
@@ -153,6 +192,10 @@ class AuthController extends Controller
                 'message' => 'حساب کاربری شما غیرفعال شده است. لطفاً با مدیر سیستم تماس بگیرید.',
             ], 403);
         }
+
+        // توکن‌های قدیمیِ این کاربر را پاک‌سازی کن تا جدول personal_access_tokens
+        // به‌طور نامحدود رشد نکند.
+        $user->tokens()->where('created_at', '<', now()->subDays(30))->delete();
 
         $token = $user->createToken('api-token')->plainTextToken;
         $permissions = $user->getAllPermissions()->pluck('name')->values()->all();
@@ -244,6 +287,15 @@ class AuthController extends Controller
 
         $user->save();
 
+        // تغییر رمز باید نشست‌های دیگر را باطل کند؛ توکن همین درخواست باقی می‌ماند.
+        if (! empty($validated['password'])) {
+            $token = $request->user()?->currentAccessToken();
+            $currentTokenId = $token instanceof \Laravel\Sanctum\PersonalAccessToken ? $token->getKey() : null;
+            $user->tokens()
+                ->when($currentTokenId, fn ($query) => $query->whereKeyNot($currentTokenId))
+                ->delete();
+        }
+
         $permissions = $user->getAllPermissions()->pluck('name')->values()->all();
 
         return response()->json([
@@ -287,7 +339,8 @@ class AuthController extends Controller
             minutes: 60 * 24 * 7, // 7 days
             path: '/',
             domain: null,
-            secure: false, // allow http in local/docker environment
+            // روی HTTPS (تولید) کوکی حتماً Secure باشد؛ در localhost/HTTP خاموش می‌ماند.
+            secure: request()->isSecure() || str_starts_with((string) config('app.url'), 'https://'),
             httpOnly: true,
             raw: false,
             sameSite: 'Lax'

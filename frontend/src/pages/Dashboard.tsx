@@ -19,7 +19,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { StatCard } from "../components/ui/StatCard";
 import { dashboardApi } from "../services/api";
 import { useAuthStore } from "../store/useAuthStore";
-import { cx, dateFa, num, relativeFa, weekdayFa } from "../utils/format";
+import { cx, dateFa, fullName, num, relativeFa, weekdayFa } from "../utils/format";
 
 export default function Dashboard() {
   const user = useAuthStore((s) => s.user);
@@ -199,9 +199,7 @@ export default function Dashboard() {
                     </p>
                     <div className="flex items-center gap-2 mt-1 text-xs text-base-content/50">
                       <span>
-                        {act.customer
-                          ? `${act.customer.first_name} ${act.customer.last_name}`
-                          : "—"}
+                        {act.customer ? fullName(act.customer) : "—"}
                       </span>
                       <span>•</span>
                       <span>{relativeFa(act.created_at)}</span>
@@ -254,9 +252,7 @@ export default function Dashboard() {
                         </span>
                       </div>
                       <p className="text-base-content/60 truncate max-w-[200px]">
-                        {sms.customer
-                          ? `${sms.customer.first_name} ${sms.customer.last_name}`
-                          : "ارسال مستقیم"}
+                        {sms.customer ? fullName(sms.customer) : "ارسال مستقیم"}
                       </p>
                     </div>
 

@@ -12,8 +12,8 @@ class EditCustomer extends EditRecord
 
     protected function getHeaderActions(): array
     {
-        return [
-            Actions\DeleteAction::make(),
-        ];
+        // حذف از پنل مدیریت غیرفعال است تا موجودی انبار/تاریخچه/سند حسابرسی از این
+        // مسیر دور زده نشود؛ حذف فقط از خود سامانه و با کنترل‌های آن انجام می‌شود.
+        return [];
     }
 }

@@ -2,4 +2,4 @@
  * نسخه سمانتیک فرانت‌اند — با package.json و CHANGELOG هم‌راستا نگه داشته می‌شود.
  * برای نمایش در فوتر/صفحه ورود استفاده می‌شود.
  */
-export const APP_VERSION = '2.0.1'
+export const APP_VERSION = '2.0.2'

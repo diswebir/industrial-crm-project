@@ -11,6 +11,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class UserResource extends Resource
@@ -24,6 +25,12 @@ class UserResource extends Resource
     protected static ?string $modelLabel = 'کاربر';
 
     protected static ?string $pluralModelLabel = 'کاربران';
+
+    public static function canEdit(Model $record): bool
+    {
+        // فقط خود مدیر اصلی می‌تواند حساب مدیر اصلی را ویرایش کند (از جمله رمز عبور).
+        return ! $record->isRootAdmin() || auth()->id() === $record->id;
+    }
 
     public static function form(Form $form): Form
     {
@@ -51,6 +58,7 @@ class UserResource extends Resource
                     ->maxLength(255),
                 Forms\Components\Select::make('user_type')
                     ->label('نوع کاربر')
+                    ->disabled(fn (?User $record): bool => (bool) $record?->isRootAdmin())
                     ->options([
                         'administrator' => 'مدیر ارشد (Administrator)',
                         'manager' => 'مدیر (Manager)',
@@ -61,6 +69,7 @@ class UserResource extends Resource
                     ->required(),
                 Forms\Components\Select::make('data_scope')
                     ->label('دامنه دسترسی مشتریان')
+                    ->disabled(fn (?User $record): bool => (bool) $record?->isRootAdmin())
                     ->options([
                         'all' => 'همه مشتریان سامانه',
                         'own' => 'فقط مشتریان ثبت‌شده توسط خودم',
@@ -71,6 +80,7 @@ class UserResource extends Resource
                 Forms\Components\Toggle::make('is_active')
                     ->label('حساب کاربری فعال است')
                     ->default(true)
+                    ->disabled(fn (?User $record): bool => (bool) $record?->isRootAdmin())
                     ->required(),
                 Forms\Components\CheckboxList::make('permissions')
                     ->label('مجوزهای مستقیم سیستمی (Pure ACL)')
@@ -133,11 +143,9 @@ class UserResource extends Resource
             ->actions([
                 Tables\Actions\EditAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
-            ]);
+            // حذف گروهی از پنل مدیریت غیرفعال است: حذف مشتری/دستگاه باید از
+            // مسیر اصلی سامانه انجام شود تا موجودی انبار و تاریخچه حفظ شود.
+            ;
     }
 
     public static function getRelations(): array

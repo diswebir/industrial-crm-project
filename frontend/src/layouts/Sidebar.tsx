@@ -70,9 +70,12 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
 
   const isAdministrator = useAuthStore((s) => s.isAdministrator)()
 
-  const visibleSettingsItems = SETTINGS_NAV.filter(
-    (item) => !item.permission || hasPermission(item.permission),
-  ).map((item) => {
+  const canSeeNavItem = (item: { permission?: string; anyPermission?: string[] }) =>
+    (!item.permission && !item.anyPermission) ||
+    (item.permission ? hasPermission(item.permission) : false) ||
+    Boolean(item.anyPermission?.some((permission) => hasPermission(permission)))
+
+  const visibleSettingsItems = SETTINGS_NAV.filter(canSeeNavItem).map((item) => {
     if (item.to === '/settings/system' && !isAdministrator) {
       return { ...item, label: 'تنظیمات پوسته نمایشی' }
     }
@@ -99,7 +102,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
           {/* Main Navigation Groups */}
           {MAIN_NAV.map((group) => {
-            const visibleItems = group.items.filter((item) => !item.permission || hasPermission(item.permission))
+            const visibleItems = group.items.filter(canSeeNavItem)
             if (!visibleItems.length) return null
 
             return (

@@ -106,6 +106,9 @@ class UserController extends Controller
         $users = User::query()
             ->where('is_active', true)
             ->when($callingUser, fn ($q) => $q->where('id', '!=', $callingUser->id))
+            ->when($callingUser && ! $callingUser->isAdministrator(), fn ($q) => $q->where(function ($sub) {
+                $sub->where('user_type', '!=', 'administrator')->orWhereNull('user_type');
+            }))
             ->orderBy('name')
             ->get(['id', 'name', 'user_type', 'email'])
             ->map(fn (User $u) => [
@@ -201,8 +204,14 @@ class UserController extends Controller
         // دامنه دسترسی: نقش‌های عملیاتی به صورت پیش‌فرض فقط مشتریان خودشان را می‌بینند.
         $defaultScope = in_array($resolvedType, ['salesperson', 'installer'], true) ? 'own' : 'all';
         $resolvedScope = $validated['data_scope'] ?? $defaultScope;
-        if ($resolvedScope === 'all' && ! $callingUser?->isAdministrator()) {
-            $resolvedScope = $defaultScope;
+
+        // هیچ کاربر غیرمدیر ارشد نمی‌تواند دامنه‌ای وسیع‌تر از دامنه خودش به
+        // حساب جدید بدهد؛ در غیر این صورت یک مدیر محدود می‌توانست حساب تازه با
+        // دسترسی «همه مشتریان» بسازد و از آن استفاده کند.
+        if (! $callingUser?->isAdministrator()) {
+            if (! $callingUser?->hasFullCustomerAccess() || $resolvedScope === 'custom') {
+                $resolvedScope = 'own';
+            }
         }
 
         $user = DB::transaction(function () use ($validated, $avatarPath, $resolvedType, $resolvedScope, $request) {
@@ -257,6 +266,12 @@ class UserController extends Controller
     public function update(Request $request, User $user): JsonResponse
     {
         $this->authorizePermission('users.manage');
+
+        if ($user->isRootAdmin() && auth()->id() !== $user->id) {
+            return response()->json([
+                'message' => 'فقط مدیر اصلی می‌تواند حساب مدیر اصلی را ویرایش کند.',
+            ], 403);
+        }
 
         $callingUser = auth()->user();
         if ($user->isAdministrator() && (!$callingUser || !$callingUser->isAdministrator())) {
@@ -321,7 +336,7 @@ class UserController extends Controller
             $newType = $validated['user_type'] ?? null;
             if ($newType && in_array($newType, User::USER_TYPES, true)) {
                 // Ensure the root admin user remains administrator
-                if ($user->email === 'admin@crm.local') {
+                if ($user->isRootAdmin()) {
                     $user->user_type = 'administrator';
                 } else {
                     $user->user_type = $newType;
@@ -330,7 +345,7 @@ class UserController extends Controller
         }
 
         // دامنه دسترسی فقط توسط مدیر ارشد قابل تغییر است.
-        if ($request->has('data_scope') && $callingUser?->isAdministrator() && $user->email !== 'admin@crm.local') {
+        if ($request->has('data_scope') && $callingUser?->isAdministrator() && ! $user->isRootAdmin()) {
             $newScope = $validated['data_scope'] ?? null;
             if ($newScope && in_array($newScope, User::DATA_SCOPES, true)) {
                 $user->data_scope = $newScope;
@@ -343,6 +358,19 @@ class UserController extends Controller
         }
 
         $user->save();
+
+        // بازنشانی رمز توسط مدیر، نشست‌های قبلی کاربر را باطل می‌کند.
+        if (! empty($validated['password'])) {
+            $currentToken = $user->id === auth()->id()
+                ? auth()->user()?->currentAccessToken()
+                : null;
+            $currentTokenId = $currentToken instanceof \Laravel\Sanctum\PersonalAccessToken
+                ? $currentToken->getKey()
+                : null;
+            $user->tokens()
+                ->when($currentTokenId, fn ($query) => $query->whereKeyNot($currentTokenId))
+                ->delete();
+        }
 
         if ($request->has('permissions') || $request->has('sync_permissions')) {
             $requestedPerms = $validated['permissions'] ?? [];
@@ -389,8 +417,8 @@ class UserController extends Controller
             ], 422);
         }
 
-        // Prevent deleting the original admin@crm.local account
-        if ($user->email === 'admin@crm.local') {
+        // Prevent deleting the original root administrator account
+        if ($user->isRootAdmin()) {
             return response()->json([
                 'message' => 'امکان حذف حساب مدیر اصلی سیستم وجود ندارد.',
             ], 422);
@@ -410,7 +438,16 @@ class UserController extends Controller
 
         $userName = $user->name;
 
-        DB::transaction(function () use ($user) {
+        $reassignTo = auth()->id();
+
+        DB::transaction(function () use ($user, $reassignTo) {
+            // پرونده‌های مشتری نباید با حذف کارمند «یتیم» شوند؛ به حساب حذف‌کننده
+            // منتقل می‌شوند تا از دید مدیر سامانه خارج نشوند.
+            if ($reassignTo) {
+                \App\Models\Customer::where('created_by', $user->id)
+                    ->update(['created_by' => $reassignTo]);
+            }
+
             // دسترسی‌های استثنا و مجوزها باید قبل از حذف پاک شوند.
             CustomerAccessGrant::where('user_id', $user->id)->delete();
             CustomerAccessGrant::where('target_user_id', $user->id)->delete();
@@ -428,6 +465,12 @@ class UserController extends Controller
         $this->authorizePermission('users.manage');
 
         $callingUser = auth()->user();
+        if ($user->isRootAdmin()) {
+            return response()->json([
+                'message' => 'مجوزهای حساب مدیر اصلی سیستم ثابت است و قابل تغییر نیست.',
+            ], 422);
+        }
+
         if ($user->isAdministrator() && (!$callingUser || !$callingUser->isAdministrator())) {
             abort(403, 'مدیران عادی امکان تغییر دسترسی‌های مدیر ارشد را ندارند.');
         }
@@ -465,6 +508,11 @@ class UserController extends Controller
     {
         $this->authorizePermission('users.manage');
 
+        $callingUser = auth()->user();
+        if ($user->isAdministrator() && (!$callingUser || ! $callingUser->isAdministrator())) {
+            abort(403, 'مدیران عادی دسترسی به اطلاعات حساب مدیر ارشد را ندارند.');
+        }
+
         $grants = CustomerAccessGrant::query()
             ->where('user_id', $user->id)
             ->get(['scope_type', 'target_user_id', 'customer_id']);
@@ -489,7 +537,7 @@ class UserController extends Controller
             abort(403, 'تعریف دامنه دسترسی مشتریان فقط توسط مدیر ارشد سامانه امکان‌پذیر است.');
         }
 
-        if ($user->email === 'admin@crm.local') {
+        if ($user->isRootAdmin()) {
             return response()->json([
                 'message' => 'دامنه دسترسی حساب مدیر اصلی سیستم قابل تغییر نیست و همیشه «همه مشتریان» است.',
             ], 422);
@@ -555,6 +603,12 @@ class UserController extends Controller
     public function toggleActive(User $user): JsonResponse
     {
         $this->authorizePermission('users.manage');
+
+        if ($user->isRootAdmin()) {
+            return response()->json([
+                'message' => 'وضعیت حساب مدیر اصلی سیستم قابل تغییر نیست.',
+            ], 422);
+        }
 
         $callingUser = auth()->user();
         if ($user->isAdministrator() && (!$callingUser || !$callingUser->isAdministrator())) {

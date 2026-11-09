@@ -90,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo page('وضعیت مایگریشن‌ها',
         '<div class="note">وضعیت فعلی جدول‌های دیتابیس (Pending = مایگریشن‌هایی که اجرا نشده‌اند):</div>'
         . '<pre>' . e($status) . '</pre>'
-        . '<form method="post"><input type="hidden" name="key" value="' . e($appKey) . '">'
+        . '<form method="post"><input type="password" name="key" required autocomplete="off" placeholder="APP_KEY را دوباره وارد کنید">'
         . '<button type="submit">▶ اجرای مایگریشن‌های اجرانشده (migrate --force)</button></form>'
         . '<div class="note">💡 قبل از اجرا از دیتابیس بکاپ بگیر (phpMyAdmin → Export).</div>');
     exit;

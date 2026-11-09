@@ -17,7 +17,10 @@ class SettingController extends Controller
         $username = Setting::get('melipayamak_username') ?: env('MELIPAYAMAK_USERNAME', '');
         $password = Setting::get('melipayamak_password') ?: env('MELIPAYAMAK_PASSWORD', '');
         $fromNumber = Setting::get('melipayamak_from') ?: env('MELIPAYAMAK_FROM', '');
-        $sandbox = Setting::get('melipayamak_sandbox', 'true') === 'true';
+        // پیش‌فرض «خاموش» است؛ روشن‌بودن ناخواسته sandbox باعث می‌شود پیامک‌ها
+        // واقعاً ارسال نشوند و در گذشته کد ورود در پاسخ HTTP برگردانده می‌شد.
+        $sandboxValue = Setting::get('melipayamak_sandbox', env('MELIPAYAMAK_SANDBOX', 'false'));
+        $sandbox = filter_var($sandboxValue, FILTER_VALIDATE_BOOLEAN);
 
         return response()->json([
             'melipayamak_username' => $username,

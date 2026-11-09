@@ -12,7 +12,7 @@ return [
      * The title and info of the API.
      */
     'info' => [
-        'version' => '2.0.1',
+        'version' => '2.0.2',
         'title' => 'سامانه مدیریت مشتریان و دستگاه‌ها صنعتی (Parts CRM API)',
         'description' => 'مستندات کامل اندپوئینت‌های احراز هویت، مدیریت مشتریان، کاتالوگ دستگاه‌ها، تخصیص شماره سریال، سوابق سرویس و پیامک‌های الگو.',
     ],
@@ -27,7 +27,9 @@ return [
     ],
 
     'servers' => [
-        'Local API Server' => 'http://localhost:8000/api/v1',
+        // آدرس مستندات باید با دامنه واقعی نصب هم‌خوان باشد؛ در غیر این صورت دکمه
+        // «Try it» در محیط تولید به localhost اشاره می‌کند.
+        'API Server' => rtrim((string) env('APP_URL', 'http://localhost'), '/') . '/api/v1',
     ],
 
     'middleware' => [

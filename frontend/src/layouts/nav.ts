@@ -17,6 +17,8 @@ export interface NavItem {
   icon: LucideIcon
   end?: boolean
   permission?: string
+  /** هر یک از این مجوزها برای نمایش آیتم کافی است. */
+  anyPermission?: string[]
   external?: boolean
 }
 
@@ -43,7 +45,7 @@ export const MAIN_NAV: NavGroup[] = [
   {
     title: 'ارتباطات و پیام‌رسانی',
     items: [
-      { to: '/sms', label: 'سامانه پیامک (ملی‌پیامک)', icon: MessageSquare, permission: 'sms.send' },
+      { to: '/sms', label: 'سامانه پیامک (ملی‌پیامک)', icon: MessageSquare, anyPermission: ['sms.send', 'sms.logs'] },
     ],
   },
 ]

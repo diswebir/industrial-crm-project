@@ -38,7 +38,10 @@ class CustomerService
             : Carbon::now();
 
         $warrantyMonths = (int) ($part->periodic_service_months ?: 12);
-        $warrantyExpire = (clone $installDate)->addMonths($warrantyMonths);
+        // تاریخ پایان گارانتیِ واردشده در فرم باید بر مقدار محاسبه‌شده اولویت داشته باشد.
+        $warrantyExpire = ! empty($data['warranty_expire_date'])
+            ? Carbon::parse($data['warranty_expire_date'])
+            : (clone $installDate)->addMonths($warrantyMonths);
 
         return DB::transaction(function () use ($customer, $part, $data, $userId, $quantity, $serialNumber, $installDate, $warrantyExpire) {
             $customerPart = $customer->customerParts()->create([
@@ -248,6 +251,12 @@ class CustomerService
      */
     public function deleteDevice(CustomerPart $customerPart, ?int $userId = null): void
     {
+        if ($customerPart->serviceHistories()->exists()) {
+            throw ValidationException::withMessages([
+                'assignment' => ['این دستگاه سابقه سرویس/تعمیر دارد و حذف تخصیص آن مجاز نیست.'],
+            ]);
+        }
+
         DB::transaction(function () use ($customerPart, $userId) {
             $customer = $customerPart->customer;
             $part = $customerPart->part;
@@ -289,6 +298,12 @@ class CustomerService
      */
     public function deleteCustomer(Customer $customer, ?int $userId = null): void
     {
+        if ($customer->customerParts()->whereHas('serviceHistories')->exists()) {
+            throw ValidationException::withMessages([
+                'customer' => ['این مشتری سابقه سرویس/تعمیر دارد و حذف پرونده مجاز نیست.'],
+            ]);
+        }
+
         DB::transaction(function () use ($customer, $userId) {
             $assignments = $customer->customerParts()->with('part')->get();
 

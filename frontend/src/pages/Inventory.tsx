@@ -20,6 +20,7 @@ import { TableSkeleton, EmptyState } from '../components/ui/Field'
 import { StockMovementModal } from '../components/parts/StockMovementModal'
 import { Can } from '../components/common/Can'
 import { inventoryApi } from '../services/api'
+import { useDebouncedValue } from '../utils/useDebouncedValue'
 import { cx, dateTimeFa, num, relativeFa } from '../utils/format'
 import type { InventoryMovementType } from '../types'
 
@@ -51,11 +52,13 @@ export default function Inventory() {
     queryFn: inventoryApi.parts,
   })
 
+  const debouncedQ = useDebouncedValue(q, 300)
+
   const { data, isLoading } = useQuery({
-    queryKey: ['inventory-logs', { q, type, partId, page }],
+    queryKey: ['inventory-logs', { q: debouncedQ, type, partId, page }],
     queryFn: () =>
       inventoryApi.logs({
-        q: q.trim() || undefined,
+        q: debouncedQ.trim() || undefined,
         type: type || undefined,
         part_id: partId || undefined,
         page,
@@ -216,7 +219,7 @@ export default function Inventory() {
           <div className="p-4">
             <table className="table">
               <tbody>
-                <TableSkeleton rows={8} cols={7} />
+                <TableSkeleton rows={8} cols={8} />
               </tbody>
             </table>
           </div>

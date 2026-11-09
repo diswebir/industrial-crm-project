@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { Field } from "../components/ui/Field";
 import { Logo } from "../layouts/Sidebar";
@@ -57,6 +58,7 @@ export default function Login() {
   const { theme, toggle } = useThemeStore();
   const nav = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
 
   const [authMode, setAuthMode] = useState<"password" | "otp">("password");
   const [show, setShow] = useState(false);
@@ -67,7 +69,6 @@ export default function Login() {
   const [otpCode, setOtpCode] = useState("");
   const [otpStep, setOtpStep] = useState<"request" | "verify">("request");
   const [otpCooldown, setOtpCooldown] = useState(0);
-  const [sandboxCode, setSandboxCode] = useState<string | null>(null);
   const [otpLoading, setOtpLoading] = useState(false);
 
   // Countdown timer for OTP
@@ -89,7 +90,9 @@ export default function Login() {
   });
 
   const isInitialized = useAuthStore((s) => s.isInitialized);
-  const from = (location.state as { from?: string } | null)?.from ?? "/";
+  const queryFrom = new URLSearchParams(location.search).get("from");
+  const safeQueryFrom = queryFrom && queryFrom.startsWith("/") && !queryFrom.startsWith("//") ? queryFrom : null;
+  const from = (location.state as { from?: string } | null)?.from ?? safeQueryFrom ?? "/";
   if (isInitialized && user) return <Navigate to={from} replace />;
 
   const onSubmit = async (v: FormValues) => {
@@ -97,6 +100,8 @@ export default function Login() {
     const res: any = await login(v.login, v.password);
     if (res.ok) {
       toast.success("خوش آمدید 👋");
+      // کش کاربر قبلی (در صورت ورود چند کاربر روی یک مرورگر) پاک می‌شود.
+      queryClient.clear();
       nav(from, { replace: true });
     } else {
       setError(res.error);
@@ -116,9 +121,6 @@ export default function Login() {
       toast.success(res.message);
       setOtpStep("verify");
       setOtpCooldown(res.expires_in || 120);
-      if (res.sandbox_code) {
-        setSandboxCode(res.sandbox_code);
-      }
     } catch (err: any) {
       setError(
         err.response?.data?.message ||
@@ -142,6 +144,7 @@ export default function Login() {
       const res: any = await loginWithOtp(otpPhone, otpCode);
       if (res.ok) {
         toast.success("ورود موفقیت‌آمیز بود 👋");
+        queryClient.clear();
         nav(from, { replace: true });
       } else {
         setError(res.error);
@@ -349,15 +352,6 @@ export default function Login() {
                       تغییر شماره
                     </button>
                   </div>
-
-                  {sandboxCode && (
-                    <div className="rounded-xl border border-primary/30 bg-primary/10 p-2.5 text-xs text-primary font-bold flex items-center justify-between">
-                      <span>حالت شبیه‌ساز فعال است</span>
-                      <span className="font-mono text-sm">
-                        کد تست: {sandboxCode}
-                      </span>
-                    </div>
-                  )}
 
                   <Field label="کد تأیید ۵ رقمی پیامک‌شده">
                     <input

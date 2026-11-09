@@ -10,7 +10,7 @@ import { Field } from '../ui/Field'
 import { SearchableSelect } from '../ui/SearchableSelect'
 import { DatePicker } from '../ui/DatePicker'
 import { partApi } from '../../services/api'
-import { digits, num, toEnDigits, toman } from '../../utils/format'
+import { digits, num, toEnDigits, todayIso, toman } from '../../utils/format'
 import type { Customer, CustomerPart, Part } from '../../types'
 
 const schema = z.object({
@@ -58,7 +58,8 @@ export function AssignDeviceModal({ open, onClose, customer, assignment, onSucce
     enabled: open,
   })
 
-  const today = new Date().toISOString().slice(0, 10)
+  // تاریخ محلی و پایدار در طول عمر مودال (toISOString در ساعات اولیه تهران روز قبل را می‌داد).
+  const today = useMemo(() => todayIso(), [])
 
   // جلوگیری از بازنویسی فرم در حال تکمیل هنگام refetch کاتالوگ (focus/refetch).
   const wasOpenRef = useRef(false)

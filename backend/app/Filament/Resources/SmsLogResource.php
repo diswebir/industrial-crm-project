@@ -84,14 +84,9 @@ class SmsLogResource extends Resource
             ->filters([
                 //
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
-            ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
-            ]);
+            // لاگ پیامک سند حسابرسی است؛ ویرایش/حذف آن از پنل مدیریت غیرفعال است.
+            ->actions([])
+            ->bulkActions([]);
     }
 
     public static function getRelations(): array
@@ -104,9 +99,8 @@ class SmsLogResource extends Resource
     public static function getPages(): array
     {
         return [
+            // فقط فهرست؛ ایجاد/ویرایش لاگ پیامک مجاز نیست (سند حسابرسی).
             'index' => Pages\ListSmsLogs::route('/'),
-            'create' => Pages\CreateSmsLog::route('/create'),
-            'edit' => Pages\EditSmsLog::route('/{record}/edit'),
         ];
     }
 }

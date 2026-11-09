@@ -34,6 +34,14 @@ export function phoneFa(p: string): string {
   return digits(p.replace(/^(\d{4})(\d{3})(\d{4})$/, '$1 $2 $3'))
 }
 
+/** امروزِ محلی (نه UTC) به شکل YYYY-MM-DD؛ برای مقدار پیش‌فرض فیلدهای تاریخ. */
+export function todayIso(): string {
+  const d = new Date()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${month}-${day}`
+}
+
 export function safeDate(val: string | Date | null | undefined): Date | null {
   if (!val) return null
   if (val instanceof Date) return isNaN(val.getTime()) ? null : val

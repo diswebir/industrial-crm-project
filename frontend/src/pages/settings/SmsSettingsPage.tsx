@@ -22,7 +22,7 @@ export default function SmsSettingsPage() {
     username: '',
     password: '',
     from: '',
-    sandbox: true,
+    sandbox: false,
   })
 
   useEffect(() => {
@@ -31,7 +31,7 @@ export default function SmsSettingsPage() {
         username: smsSettings.melipayamak_username || '',
         password: '',
         from: smsSettings.melipayamak_from || '',
-        sandbox: smsSettings.melipayamak_sandbox ?? true,
+        sandbox: smsSettings.melipayamak_sandbox ?? false,
       })
     }
   }, [smsSettings])
