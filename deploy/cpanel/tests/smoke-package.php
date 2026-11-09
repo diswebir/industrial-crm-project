@@ -25,7 +25,9 @@ foreach ([1, 2] as $attempt) {
 $admin = App\Models\User::where('email', 'admin@crm.local')->firstOrFail();
 check($admin->isAdministrator(), 'Migrated administrator has administrator type');
 check(!Illuminate\Support\Facades\Hash::check('Admin@123456', $admin->password), 'Installer migration does not expose the demo password');
-check($admin->getAllPermissions()->count() === 14, 'Administrator has all 14 direct permissions');
+$expectedPermissions = Spatie\Permission\Models\Permission::where('guard_name', 'web')->count();
+check($expectedPermissions >= 18, 'All v2 permissions are seeded');
+check($admin->getAllPermissions()->count() === $expectedPermissions, 'Administrator has every seeded permission');
 check(Illuminate\Support\Facades\Artisan::call('route:list', ['--except-vendor' => true]) === 0, 'Packaged application routes load');
 check(Illuminate\Support\Facades\Storage::disk('public')->put('smoke.txt', 'upload test'), 'Public disk accepts an upload');
 check(is_file($public.'/storage/smoke.txt'), 'Upload lands in external document root');
