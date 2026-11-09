@@ -12,6 +12,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Customers = lazy(() => import('./pages/Customers'))
 const CustomerDetail = lazy(() => import('./pages/CustomerDetail'))
 const Parts = lazy(() => import('./pages/Parts'))
+const Inventory = lazy(() => import('./pages/Inventory'))
 const SmsCenter = lazy(() => import('./pages/SmsCenter'))
 const SmsSettingsPage = lazy(() => import('./pages/settings/SmsSettingsPage'))
 const UsersAclPage = lazy(() => import('./pages/settings/UsersAclPage'))
@@ -65,6 +66,7 @@ export default function App() {
                 </PermissionRoute>
               }
             />
+            <Route path="inventory" element={<PermissionRoute permission="parts.view"><Inventory /></PermissionRoute>} />
             <Route
               path="sms"
               element={

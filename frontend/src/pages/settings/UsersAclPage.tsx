@@ -170,7 +170,7 @@ export default function UsersAclPage() {
                                 </span>
                               ) : (
                                 <span className="badge badge-xs bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300">
-                                  مدیر
+                                  {u.user_type === 'salesperson' ? 'کارمند فروش' : u.user_type === 'installer' ? 'نصاب' : 'مدیر'}
                                 </span>
                               )}
                             </div>

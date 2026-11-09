@@ -109,7 +109,7 @@ export default function Customers() {
     <div className="space-y-6">
       <PageHeader
         title="مدیریت مشتریان"
-        subtitle="فهرست مشتریان بالقوه و بالفعل، قطعات تخصیص‌یافته و پرونده مشتریان"
+        subtitle="فهرست مشتریان بالقوه و بالفعل، دستگاه‌ها تخصیص‌یافته و پرونده مشتریان"
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Can permission="customers.export">
@@ -171,7 +171,7 @@ export default function Customers() {
             }}
           >
             <UserCheck className="size-3.5 text-emerald-600" />
-            مشتریان بالفعل (خریدار قطعه)
+            مشتریان بالفعل (خریدار دستگاه)
           </button>
           <button
             role="tab"
@@ -230,7 +230,7 @@ export default function Customers() {
                   <th>وضعیت مشتری</th>
                   <th>اطلاعات تماس</th>
                   <th>شهر و استان</th>
-                  <th>قطعات تخصیص‌یافته</th>
+                  <th>دستگاه‌ها تخصیص‌یافته</th>
                   <th>تاریخ ثبت</th>
                   <th className="text-end">عملیات</th>
                 </tr>
@@ -255,7 +255,7 @@ export default function Customers() {
                             to={`/customers/${c.id}`}
                             className="font-bold text-sm text-base-content hover:text-primary transition-colors"
                           >
-                            {c.first_name} {c.last_name}
+                            {c.full_name || c.company_name || [c.first_name, c.last_name].filter(Boolean).join(' ')}
                           </Link>
                           {c.company_name && (
                             <p className="text-xs text-base-content/50 truncate max-w-[180px]">{c.company_name}</p>
@@ -291,7 +291,7 @@ export default function Customers() {
                         className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline"
                       >
                         <Cpu className="size-3.5" />
-                        {num(c.customer_parts_count ?? 0)} قطعه
+                        {num(c.customer_parts_count ?? 0)} دستگاه
                       </Link>
                     </td>
 
@@ -371,7 +371,7 @@ export default function Customers() {
         onClose={() => setDeleting(null)}
         onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
         title="حذف پرونده مشتری"
-        message={`آیا از حذف مشتری «${deleting?.first_name} ${deleting?.last_name}» اطمینان دارید؟ تمام سوابق و قطعات تخصیص یافته به این مشتری نیز حذف خواهند شد.`}
+        message={`آیا از حذف مشتری «${deleting?.first_name} ${deleting?.last_name}» اطمینان دارید؟ پرونده و تخصیص‌ها بایگانی و موجودی به انبار بازگردانده خواهد شد.`}
         confirmText="بله، حذف کن"
         tone="error"
         loading={deleteMutation.isPending}

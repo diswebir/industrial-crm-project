@@ -29,10 +29,12 @@ import {
 import { PageSkeleton, EmptyState } from '../components/ui/Field'
 import { ConfirmDialog } from '../components/ui/Modal'
 import { CustomerFormModal } from '../components/customers/CustomerFormModal'
+import { CustomerOwnerEditor } from '../components/customers/CustomerOwnerEditor'
+import { useAuthStore } from '../store/useAuthStore'
 import { AssignPartModal } from '../components/parts/AssignPartModal'
 import { ServiceHistoryModal } from '../components/parts/ServiceHistoryModal'
 import { Can } from '../components/common/Can'
-import { customerApi } from '../services/api'
+import { customerApi, partApi } from '../services/api'
 import { cx, dateFa, dateShort, num, relativeFa, toman } from '../utils/format'
 import type { CustomerPart } from '../types'
 
@@ -42,11 +44,15 @@ export default function CustomerDetail() {
   const { id } = useParams<{ id: string }>()
   const nav = useNavigate()
   const qc = useQueryClient()
+  const isAdministrator = useAuthStore((s) => s.isAdministrator)()
+  const hasPermission = useAuthStore((s) => s.hasPermission)
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('parts')
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [assignPartOpen, setAssignPartOpen] = useState(false)
+  const [editAssignment, setEditAssignment] = useState<CustomerPart | null>(null)
+  const [deleteAssignment, setDeleteAssignment] = useState<CustomerPart | null>(null)
   const [servicePart, setServicePart] = useState<CustomerPart | null>(null)
 
   const { data: customer, isLoading, error } = useQuery({
@@ -65,6 +71,18 @@ export default function CustomerDetail() {
     onError: (err: any) => {
       toast.error(err.response?.data?.message || 'خطا در حذف مشتری')
     },
+  })
+
+  const deleteAssignmentMutation = useMutation({
+    mutationFn: (assignmentId: string | number) => partApi.deleteAssignment(assignmentId),
+    onSuccess: (result) => {
+      toast.success(result.message)
+      setDeleteAssignment(null)
+      qc.invalidateQueries({ queryKey: ['customer', id] })
+      qc.invalidateQueries({ queryKey: ['parts-catalog'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-stats'] })
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'خطا در حذف تخصیص'),
   })
 
   if (isLoading) return <PageSkeleton />
@@ -88,6 +106,7 @@ export default function CustomerDetail() {
 
   return (
     <div className="space-y-6">
+      {isAdministrator && hasPermission('users.manage') && <CustomerOwnerEditor customer={customer} />}
       {/* Back button */}
       <div>
         <Link
@@ -114,7 +133,7 @@ export default function CustomerDetail() {
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-xl font-black text-base-content">
-                  {customer.first_name} {customer.last_name}
+                  {customer.full_name || customer.company_name || [customer.first_name, customer.last_name].filter(Boolean).join(' ')}
                 </h1>
                 {customer.customer_type === 'effective' ? (
                   <span className="badge badge-success badge-soft font-bold text-xs gap-1">
@@ -151,13 +170,13 @@ export default function CustomerDetail() {
           <div className="flex flex-wrap items-center gap-2">
             <Can permission="parts.assign">
               <button className="btn btn-sm btn-primary gap-1.5" onClick={() => setAssignPartOpen(true)}>
-                <Plus className="size-4" /> تخصیص قطعه جدید
+                <Plus className="size-4" /> تخصیص دستگاه جدید
               </button>
             </Can>
 
             <Can permission="sms.send">
               <Link
-                to={`/sms?mobile=${customer.mobile}&customer_id=${customer.id}`}
+                to={`/sms?mobile=${customer.mobile || ''}&customer_id=${customer.id}`}
                 className="btn btn-sm btn-outline gap-1.5"
               >
                 <Send className="size-4" /> ارسال پیامک
@@ -192,7 +211,7 @@ export default function CustomerDetail() {
             onClick={() => setActiveTab('parts')}
           >
             <Cpu className="size-4" />
-            قطعات فیزیکی و سوابق خدمات ({num(customerParts.length)})
+            دستگاه‌ها فیزیکی و سوابق خدمات ({num(customerParts.length)})
           </button>
           <button
             role="tab"
@@ -225,10 +244,10 @@ export default function CustomerDetail() {
       {activeTab === 'parts' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-bold text-base text-base-content">قطعات فیزیکی تخصیص‌یافته به مشتری</h2>
+            <h2 className="font-bold text-base text-base-content">دستگاه‌ها فیزیکی تخصیص‌یافته به مشتری</h2>
             <Can permission="parts.assign">
               <button className="btn btn-xs btn-primary gap-1" onClick={() => setAssignPartOpen(true)}>
-                <Plus className="size-3.5" /> تخصیص قطعه دیگر
+                <Plus className="size-3.5" /> تخصیص دستگاه دیگر
               </button>
             </Can>
           </div>
@@ -236,13 +255,13 @@ export default function CustomerDetail() {
           {!customerParts.length ? (
             <div className="rounded-2xl border border-dashed border-base-300 p-8 text-center bg-base-100">
               <Cpu className="mx-auto size-12 text-base-content/30 mb-2" />
-              <p className="font-bold text-sm">هیچ قطعه‌ای برای این مشتری ثبت نشده است</p>
+              <p className="font-bold text-sm">هیچ دستگاه‌ای برای این مشتری ثبت نشده است</p>
               <p className="text-xs text-base-content/60 mt-1 max-w-sm mx-auto">
-                با تخصیص اولین قطعه فیزیکی به همراه شماره سریال یکتا، وضعیت مشتری به طور خودکار به «بالفعل» تغییر خواهد یافت.
+                با تخصیص اولین دستگاه فیزیکی به همراه شماره سریال یکتا، وضعیت مشتری به طور خودکار به «بالفعل» تغییر خواهد یافت.
               </p>
               <Can permission="parts.assign">
                 <button className="btn btn-sm btn-primary mt-4" onClick={() => setAssignPartOpen(true)}>
-                  <Plus className="size-4" /> تخصیص اولین قطعه
+                  <Plus className="size-4" /> تخصیص اولین دستگاه
                 </button>
               </Can>
             </div>
@@ -257,7 +276,7 @@ export default function CustomerDetail() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-sm text-base-content">{cp.part?.name ?? 'قطعه صنعتی'}</h3>
+                          <h3 className="font-bold text-sm text-base-content">{cp.part?.name ?? 'دستگاه صنعتی'}</h3>
                           <span className="badge badge-primary font-mono text-xs">{cp.serial_number}</span>
                         </div>
                         <p className="text-xs text-base-content/60 mt-0.5">
@@ -285,6 +304,10 @@ export default function CustomerDetail() {
                           : cp.status}
                       </span>
 
+                      <Can permission="parts.assign">
+                        <button className="btn btn-xs btn-outline" onClick={() => setEditAssignment(cp)}><Pencil className="size-3.5" /> ویرایش</button>
+                        <button className="btn btn-xs btn-outline btn-error" onClick={() => setDeleteAssignment(cp)}><Trash2 className="size-3.5" /> حذف</button>
+                      </Can>
                       <Can permission="parts.history">
                         <button
                           className="btn btn-xs btn-outline btn-primary gap-1"
@@ -296,6 +319,11 @@ export default function CustomerDetail() {
                     </div>
                   </div>
 
+                  <div className="flex flex-wrap gap-4 text-xs">
+                    <span>تعداد: {num(cp.quantity)}</span>
+                    <span>شماره فاکتور: {cp.invoice_number || '—'}</span>
+                    <span>مبلغ فاکتور: {cp.invoice_amount != null ? num(Number(cp.invoice_amount)) : '—'}</span>
+                  </div>
                   {/* Dates & Notes */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-slate-50 border border-slate-200 p-3.5 rounded-xl dark:bg-slate-900/60 dark:border-slate-800">
                     <div>
@@ -311,7 +339,7 @@ export default function CustomerDetail() {
                       </span>
                     </div>
                     <div>
-                      <span className="text-base-content/50 block">توضیحات اختصاصی قطعه:</span>
+                      <span className="text-base-content/50 block">توضیحات اختصاصی دستگاه:</span>
                       <span className="font-medium">{cp.notes || 'بدون یادداشت'}</span>
                     </div>
                   </div>
@@ -319,13 +347,13 @@ export default function CustomerDetail() {
                   {/* Part Service / Repair Histories */}
                   <div className="space-y-2 pt-2">
                     <h4 className="text-xs font-bold text-base-content/70 flex items-center gap-1.5">
-                      <Wrench className="size-3.5" /> سوابق خدمات، بررسی و تعمیرات این قطعه (
+                      <Wrench className="size-3.5" /> سوابق خدمات، بررسی و تعمیرات این دستگاه (
                       {num(cp.service_histories?.length ?? 0)})
                     </h4>
 
                     {!cp.service_histories?.length ? (
                       <p className="text-xs text-base-content/40 italic py-2">
-                        تاکنون سابقه تعمیر یا اقدام سرویسی برای این قطعه ثبت نشده است.
+                        تاکنون سابقه تعمیر یا اقدام سرویسی برای این دستگاه ثبت نشده است.
                       </p>
                     ) : (
                       <div className="divide-y divide-base-200/60 rounded-xl border border-base-200/60 bg-base-100 overflow-hidden">
@@ -409,7 +437,7 @@ export default function CustomerDetail() {
             <h2 className="font-bold text-base text-base-content">پیامک‌های ارسال شده به این مشتری (ملی‌پیامک)</h2>
             <Can permission="sms.send">
               <Link
-                to={`/sms?mobile=${customer.mobile}&customer_id=${customer.id}`}
+                to={`/sms?mobile=${customer.mobile || ''}&customer_id=${customer.id}`}
                 className="btn btn-xs btn-primary gap-1"
               >
                 <Send className="size-3" /> ارسال پیامک جدید
@@ -466,7 +494,7 @@ export default function CustomerDetail() {
             <div className="space-y-1 p-3.5 bg-slate-50 border border-slate-200 dark:bg-slate-900/60 dark:border-slate-800 rounded-xl">
               <span className="text-base-content/50">نام و نام خانوادگی:</span>
               <p className="font-bold text-sm">
-                {customer.first_name} {customer.last_name}
+                {customer.full_name || customer.company_name || [customer.first_name, customer.last_name].filter(Boolean).join(' ')}
               </p>
             </div>
 
@@ -539,6 +567,28 @@ export default function CustomerDetail() {
         }}
       />
 
+      <AssignPartModal
+        open={Boolean(editAssignment)}
+        onClose={() => setEditAssignment(null)}
+        customer={customer}
+        assignment={editAssignment}
+        onSuccess={() => {
+          qc.invalidateQueries({ queryKey: ['customer', id] })
+          qc.invalidateQueries({ queryKey: ['parts-catalog'] })
+          qc.invalidateQueries({ queryKey: ['dashboard-stats'] })
+          setEditAssignment(null)
+        }}
+      />
+      <ConfirmDialog
+        open={Boolean(deleteAssignment)}
+        onClose={() => setDeleteAssignment(null)}
+        onConfirm={() => deleteAssignment && deleteAssignmentMutation.mutate(deleteAssignment.id)}
+        title="حذف تخصیص دستگاه"
+        message="تخصیص بایگانی و تعداد آن به موجودی انبار بازگردانده می‌شود. ادامه می‌دهید؟"
+        danger
+        loading={deleteAssignmentMutation.isPending}
+      />
+
       <ServiceHistoryModal
         open={Boolean(servicePart)}
         onClose={() => setServicePart(null)}
@@ -554,7 +604,7 @@ export default function CustomerDetail() {
         onClose={() => setDeleteOpen(false)}
         onConfirm={() => deleteMutation.mutate()}
         title="حذف پرونده مشتری"
-        message={`آیا از حذف مشتری «${customer.first_name} ${customer.last_name}» و کلیه قطعات و سوابق آن اطمینان دارید؟`}
+        message={`آیا از حذف مشتری «${customer.full_name || customer.company_name || ''}» و کلیه دستگاه‌ها و سوابق آن اطمینان دارید؟`}
         confirmText="بله، حذف کن"
         tone="error"
         loading={deleteMutation.isPending}

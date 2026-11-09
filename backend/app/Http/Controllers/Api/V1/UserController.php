@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Customer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -19,10 +20,10 @@ class UserController extends Controller
         'customers.delete' => 'حذف مشتری',
         'customers.import' => 'ورود گروهی با اکسل',
         'customers.export' => 'خروجی اکسل مشتریان',
-        'parts.view' => 'مشاهده قطعات',
-        'parts.manage' => 'مدیریت و ثبت قطعات',
-        'parts.assign' => 'تخصیص قطعه به مشتری',
-        'parts.history' => 'ثبت سوابق خدمات قطعات',
+        'parts.view' => 'مشاهده دستگاه‌ها',
+        'parts.manage' => 'مدیریت و ثبت دستگاه‌ها',
+        'parts.assign' => 'تخصیص دستگاه به مشتری',
+        'parts.history' => 'ثبت سوابق خدمات دستگاه‌ها',
         'sms.send' => 'ارسال پیامک الگو',
         'sms.logs' => 'مشاهده سوابق پیامک',
         'users.manage' => 'مدیریت کاربران و دسترسی‌ها',
@@ -98,7 +99,7 @@ class UserController extends Controller
             'avatar' => 'nullable|image|max:3072',
             'permissions' => 'nullable|array',
             'permissions.*' => 'string|exists:permissions,name',
-            'user_type' => 'nullable|in:administrator,manager',
+            'user_type' => 'nullable|in:administrator,manager,salesperson,installer',
         ], [
             'name.required' => 'نام و نام خانوادگی کاربر الزامی است.',
             'email.required' => 'آدرس ایمیل الزامی است.',
@@ -137,14 +138,17 @@ class UserController extends Controller
         $user->user_type = $resolvedType;
         $user->save();
 
-        if (!empty($validated['permissions'])) {
-            $requestedPerms = $validated['permissions'];
-            if ($callingUser && !$callingUser->isAdministrator()) {
-                $callerPerms = $callingUser->getAllPermissions()->pluck('name')->all();
-                $requestedPerms = array_values(array_intersect($requestedPerms, $callerPerms));
-            }
-            $user->syncPermissions($requestedPerms);
+        // New roles get a least-privilege preset when no explicit ACL was sent.
+        $roleDefaults = [
+            'salesperson' => ['customers.view', 'customers.create', 'customers.edit', 'parts.view', 'parts.assign'],
+            'installer' => ['customers.view', 'parts.view', 'parts.history'],
+        ];
+        $requestedPerms = $validated['permissions'] ?? ($request->boolean('sync_permissions') ? [] : ($roleDefaults[$resolvedType] ?? []));
+        if ($callingUser && !$callingUser->isAdministrator()) {
+            $callerPerms = $callingUser->getAllPermissions()->pluck('name')->all();
+            $requestedPerms = array_values(array_intersect($requestedPerms, $callerPerms));
         }
+        $user->syncPermissions($requestedPerms);
 
         return response()->json([
             'message' => 'کاربر جدید با دسترسی‌های تعیین‌شده با موفقیت ایجاد شد.',
@@ -180,7 +184,7 @@ class UserController extends Controller
             'avatar' => 'nullable|image|max:3072',
             'permissions' => 'nullable|array',
             'permissions.*' => 'string|exists:permissions,name',
-            'user_type' => 'nullable|in:administrator,manager',
+            'user_type' => 'nullable|in:administrator,manager,salesperson,installer',
         ], [
             'name.required' => 'نام و نام خانوادگی کاربر الزامی است.',
             'email.required' => 'آدرس ایمیل الزامی است.',
@@ -298,6 +302,12 @@ class UserController extends Controller
             ], 403);
         }
 
+        if (Customer::withTrashed()->where('created_by_user_id', $user->id)->exists()) {
+            return response()->json([
+                'message' => 'ابتدا مالکیت پرونده‌های این کاربر را به کاربر دیگری منتقل کنید.',
+            ], 422);
+        }
+
         if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
             Storage::disk('public')->delete($user->avatar);
         }
@@ -400,7 +410,7 @@ class UserController extends Controller
     protected function authorizePermission(string $permission): void
     {
         $user = auth()->user();
-        if (!$user || !$user->hasPermissionTo($permission)) {
+        if (!$user || !$user->hasPermissionTo($permission) || ($permission === 'users.manage' && $user->hasRestrictedCustomers())) {
             abort(403, "شما دسترسی لازم ({$permission}) برای این عملیات را ندارید.");
         }
     }

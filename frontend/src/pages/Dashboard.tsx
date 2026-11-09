@@ -44,7 +44,7 @@ export default function Dashboard() {
     <div className="space-y-6">
       <PageHeader
         title={`سلام، ${user?.name || "کاربر گرامی"} 👋`}
-        subtitle={`${weekdayFa(today)}، ${dateFa(today)} — خلاصه وضعیت مدیریت قطعات و مشتریان`}
+        subtitle={`${weekdayFa(today)}، ${dateFa(today)} — خلاصه وضعیت مدیریت دستگاه‌ها و مشتریان`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Can permission="customers.create">
@@ -83,7 +83,7 @@ export default function Dashboard() {
           value={num(stats.effective_customers)}
           icon={UserCheck}
           tone="success"
-          hint="دارای قطعه فیزیکی"
+          hint="دارای دستگاه فیزیکی"
           loading={isLoading}
           to="/customers?type=effective"
         />
@@ -97,7 +97,7 @@ export default function Dashboard() {
           to="/customers?type=potential"
         />
         <StatCard
-          title="مدل‌های قطعات"
+          title="مدل‌های دستگاه‌ها"
           value={num(stats.total_parts)}
           icon={Cpu}
           tone="secondary"
@@ -106,7 +106,7 @@ export default function Dashboard() {
           to="/parts"
         />
         <StatCard
-          title="قطعات تخصیص‌یافته"
+          title="دستگاه‌ها تخصیص‌یافته"
           value={num(stats.assigned_parts)}
           icon={Boxes}
           tone="primary"
@@ -280,9 +280,9 @@ export default function Dashboard() {
               خط‌مشی گارانتی و سرویس دوره‌ای
             </h4>
             <p className="mt-2 text-xs text-indigo-900 leading-relaxed dark:text-indigo-300">
-              سرویس‌های دوره‌ای قطعات اجباری نبوده و به عنوان پوشش گارانتی
+              سرویس‌های دوره‌ای دستگاه‌ها اجباری نبوده و به عنوان پوشش گارانتی
               اختیاری شرکت برای مشتریان در نظر گرفته می‌شود. هر زمان مشتری
-              نیازمند تعمیر یا بررسی قطعه باشد، سابقه آن در پرونده قطعه با کد
+              نیازمند تعمیر یا بررسی دستگاه باشد، سابقه آن در پرونده دستگاه با کد
               رهگیری ثبت می‌گردد.
             </p>
           </div>

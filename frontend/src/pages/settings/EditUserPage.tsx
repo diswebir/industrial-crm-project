@@ -1,3 +1,4 @@
+import { CustomerAccessEditor } from '../../components/customers/CustomerAccessEditor'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -52,7 +53,7 @@ const schema = z.object({
       }
     }),
   is_active: z.boolean(),
-  user_type: z.enum(['administrator', 'manager']).optional(),
+  user_type: z.enum(['administrator', 'manager', 'salesperson', 'installer']).optional(),
 })
 
 type EditUserFormValues = z.infer<typeof schema>
@@ -365,6 +366,12 @@ export default function EditUserPage() {
                 </div>
               </label>
 
+              {isAdministrator && (['salesperson', 'installer'] as const).map((role) => (
+                <label key={role} className="flex items-center gap-3 rounded-xl border p-3 cursor-pointer">
+                  <input type="radio" value={role} className="radio radio-primary radio-sm" {...register('user_type')} />
+                  <span>{role === 'salesperson' ? 'کارمند فروش' : 'نصاب'}</span>
+                </label>
+              ))}
               {(isAdministrator || user.user_type === 'administrator') && (
                 <label
                   className={cx(
@@ -499,6 +506,8 @@ export default function EditUserPage() {
           </button>
         </div>
       </form>
+
+      {isAdministrator && (user.user_type === 'salesperson' || user.user_type === 'installer') && <CustomerAccessEditor userId={String(user.id)} />}
 
       {/* Delete User Confirm */}
       <ConfirmDialog

@@ -13,7 +13,7 @@ class EditUser extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            // User deletion is guarded by the API ownership checks.
         ];
     }
 }

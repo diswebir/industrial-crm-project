@@ -23,7 +23,7 @@ export function Logo({ size = 'md' }: { size?: 'md' | 'lg' }) {
     staleTime: 5 * 60 * 1000,
   })
 
-  const companyName = companySettings?.company_name || 'سی‌آر‌ام قطعات'
+  const companyName = companySettings?.company_name || 'سی‌آر‌ام دستگاه‌ها'
   const logoUrl = companySettings?.company_logo_url
 
   return (

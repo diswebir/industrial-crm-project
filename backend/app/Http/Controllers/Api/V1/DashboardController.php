@@ -9,40 +9,30 @@ use App\Models\CustomerPart;
 use App\Models\Part;
 use App\Models\SmsLog;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
-    public function stats(): JsonResponse
+    public function stats(Request $request): JsonResponse
     {
-        $totalCustomers = Customer::count();
-        $effectiveCustomers = Customer::where('customer_type', 'effective')->count();
-        $potentialCustomers = Customer::where('customer_type', 'potential')->count();
-
-        $totalParts = Part::count();
-        $assignedParts = CustomerPart::count();
-        $totalSmsSent = SmsLog::where('status', 'sent')->count();
-
-        $recentActivities = CustomerHistory::with(['customer', 'user'])
-            ->latest()
-            ->take(8)
-            ->get();
-
-        $recentSms = SmsLog::with('customer')
-            ->latest()
-            ->take(6)
-            ->get();
-
+        $user = $request->user();
+        $customers = Customer::visibleTo($user);
+        $customerFilter = fn ($query) => $query->visibleTo($user);
+        $sms = SmsLog::query();
+        if ($user->hasRestrictedCustomers() && !$user->customer_access_all) {
+            $sms->whereHas('customer', $customerFilter);
+        }
         return response()->json([
             'stats' => [
-                'total_customers' => $totalCustomers,
-                'effective_customers' => $effectiveCustomers,
-                'potential_customers' => $potentialCustomers,
-                'total_parts' => $totalParts,
-                'assigned_parts' => $assignedParts,
-                'total_sms_sent' => $totalSmsSent,
+                'total_customers' => (clone $customers)->count(),
+                'effective_customers' => (clone $customers)->where('customer_type', 'effective')->count(),
+                'potential_customers' => (clone $customers)->where('customer_type', 'potential')->count(),
+                'total_parts' => Part::count(),
+                'assigned_parts' => CustomerPart::whereHas('customer', $customerFilter)->count(),
+                'total_sms_sent' => (clone $sms)->where('status', 'sent')->count(),
             ],
-            'recent_activities' => $recentActivities,
-            'recent_sms' => $recentSms,
+            'recent_activities' => CustomerHistory::whereHas('customer', $customerFilter)->with(['customer', 'user'])->latest()->take(8)->get(),
+            'recent_sms' => (clone $sms)->with('customer')->latest()->take(6)->get(),
         ]);
     }
 }

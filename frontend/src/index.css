@@ -77,8 +77,14 @@
   --noise: 0;
 }
 
+@font-face { font-family: "Vazirmatn FD"; src: url("./assets/fonts/Vazirmatn-FD-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Vazirmatn FD"; src: url("./assets/fonts/Vazirmatn-FD-Medium.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Vazirmatn FD"; src: url("./assets/fonts/Vazirmatn-FD-SemiBold.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Vazirmatn FD"; src: url("./assets/fonts/Vazirmatn-FD-Bold.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+
 @theme {
-  --font-sans: "Vazirmatn Variable", "Vazirmatn", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Vazirmatn FD", sans-serif;
+  --font-mono: "Vazirmatn FD", sans-serif;
 }
 
 @layer base {
@@ -199,3 +205,5 @@ html[data-theme="nikan-dark"][data-color="red"] {
   --color-primary: oklch(66% 0.21 25);
   --color-primary-content: oklch(15% 0.04 25);
 }
+
+input, button, select, textarea, table { font-family: var(--font-sans); }

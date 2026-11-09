@@ -15,7 +15,7 @@ export interface User {
   is_active?: boolean
   permissions: string[]
   created_at?: string
-  user_type?: 'administrator' | 'manager'
+  user_type?: 'administrator' | 'manager' | 'salesperson' | 'installer'
 }
 
 export interface CompanySettings {
@@ -45,6 +45,7 @@ export interface Customer {
   notes?: string
   created_at?: string
   updated_at?: string
+  created_by_user_id?: number | null
   customer_parts_count?: number
   customer_parts?: CustomerPart[]
   histories?: CustomerHistory[]
@@ -70,6 +71,7 @@ export interface Part {
   name: string
   code: string
   periodic_service_months: number
+  stock_quantity: number
   description?: string
   is_active: boolean
   customer_parts_count?: number
@@ -84,6 +86,9 @@ export interface CustomerPart {
   customer_id: number | string
   part_id: number | string
   serial_number: string
+  quantity: number
+  invoice_amount?: string | number | null
+  invoice_number?: string | null
   installation_date?: string
   warranty_expire_date?: string
   status: CustomerPartStatus

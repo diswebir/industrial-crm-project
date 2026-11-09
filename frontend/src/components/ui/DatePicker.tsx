@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { CalendarDays, ChevronLeft, ChevronRight, RotateCcw, X } from 'lucide-react'
 import { cx, dateFa, dateShort, digits, safeDate } from '../../utils/format'
 import { JALALI_MONTHS, WEEKDAYS_SHORT, fromJ, isSameDay, monthGrid, shiftMonth, toJ } from '../../utils/jalali'
@@ -27,7 +28,8 @@ export function DatePicker({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
-  const [dropUp, setDropUp] = useState(false)
+  const popupRef = useRef<HTMLDivElement>(null)
+  const [position, setPosition] = useState({ top: 8, left: 8 })
 
   // Parse incoming value safely
   const selectedDate = safeDate(value)
@@ -45,16 +47,27 @@ export function DatePicker({
     }
   }, [value])
 
-  // Detect available space to position dropdown above or below
-  useEffect(() => {
-    if (open && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect()
-      const spaceBelow = window.innerHeight - rect.bottom
-      if (spaceBelow < 320 && rect.top > 320) {
-        setDropUp(true)
-      } else {
-        setDropUp(false)
-      }
+  // A portal escapes clipping ancestors; native dialogs require the popup to
+  // stay inside the dialog's top layer rather than being appended to body.
+  useLayoutEffect(() => {
+    if (!open) return
+    const place = () => {
+      const anchor = containerRef.current?.getBoundingClientRect()
+      const popup = popupRef.current?.getBoundingClientRect()
+      if (!anchor || !popup) return
+      const margin = 8
+      const below = anchor.bottom + 6
+      const top = below + popup.height <= window.innerHeight - margin
+        ? below : Math.max(margin, anchor.top - popup.height - 6)
+      const left = Math.max(margin, Math.min(anchor.right - popup.width, window.innerWidth - popup.width - margin))
+      setPosition({ top, left })
+    }
+    place()
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    return () => {
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
     }
   }, [open])
 
@@ -62,7 +75,7 @@ export function DatePicker({
   useEffect(() => {
     if (!open) return
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (!containerRef.current?.contains(e.target as Node) && !popupRef.current?.contains(e.target as Node)) {
         setOpen(false)
       }
     }
@@ -73,8 +86,8 @@ export function DatePicker({
   const cells = monthGrid(view.jy, view.jm)
   const move = (delta: number) => setView((v) => shiftMonth(v.jy, v.jm, delta))
 
-  const handleSelectDay = (jd: number) => {
-    const { gy, gm, gd } = toGregorian(view.jy, view.jm, jd)
+  const handleSelectDay = (jd: number, jy = view.jy, jm = view.jm) => {
+    const { gy, gm, gd } = toGregorian(jy, jm, jd)
     if (format === 'iso') {
       const d = new Date(gy, gm - 1, gd, 12, 0, 0)
       onChange(d.toISOString())
@@ -87,7 +100,7 @@ export function DatePicker({
 
   const handleSelectToday = () => {
     setView({ jy: todayJ.jy, jm: todayJ.jm })
-    handleSelectDay(todayJ.jd)
+    handleSelectDay(todayJ.jd, todayJ.jy, todayJ.jm)
   }
 
   return (
@@ -134,12 +147,12 @@ export function DatePicker({
       </div>
 
       {/* Jalali Calendar Dropdown - Compact floating popup over all layers */}
-      {open && (
+      {open && createPortal(
         <div
-          className={cx(
-            'absolute start-0 w-72 max-w-[calc(100vw-2rem)] rounded-2xl border border-base-300 bg-base-100 p-3 shadow-2xl z-[99999] animate-in fade-in zoom-in-95 duration-150',
-            dropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5',
-          )}
+          ref={popupRef}
+          dir="rtl"
+          style={{ position: 'fixed', top: position.top, left: position.left, zIndex: 99999 }}
+          className="w-72 max-w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] overflow-auto rounded-2xl border border-base-300 bg-base-100 p-3 shadow-2xl"
         >
           {/* Header Controls */}
           <div className="mb-2.5 flex items-center justify-between gap-1 pb-2 border-b border-base-200">
@@ -249,7 +262,8 @@ export function DatePicker({
               </button>
             )}
           </div>
-        </div>
+        </div>,
+        containerRef.current?.closest('dialog[open]') ?? document.body,
       )}
     </div>
   )

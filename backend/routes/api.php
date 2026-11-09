@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CustomerController;
+use App\Http\Controllers\Api\V1\CustomerAccessController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\PartController;
 use App\Http\Controllers\Api\V1\SettingController;
@@ -34,8 +35,13 @@ Route::prefix('v1')->group(function () {
 
         // Parts & Assignments
         Route::apiResource('parts', PartController::class);
+        Route::put('/customers/{customer}/owner', [CustomerAccessController::class, 'updateOwner']);
         Route::post('/customers/{customer}/parts', [PartController::class, 'assign']);
+        Route::put('/customer-parts/{customerPart}', [PartController::class, 'updateAssignment']);
+        Route::delete('/customer-parts/{customerPart}', [PartController::class, 'deleteAssignment']);
         Route::post('/customer-parts/{customerPart}/history', [PartController::class, 'addServiceHistory']);
+        Route::post('/parts/{part}/stock', [PartController::class, 'adjustStock']);
+        Route::get('/inventory/logs', [PartController::class, 'inventoryLogs']);
 
         // SMS (Melipayamak)
         Route::post('/sms/send-pattern', [SmsController::class, 'sendPattern']);
@@ -54,6 +60,9 @@ Route::prefix('v1')->group(function () {
         Route::match(['put', 'post'], '/users/{user}', [UserController::class, 'update']);
         Route::delete('/users/{user}', [UserController::class, 'destroy']);
         Route::put('/users/{user}/permissions', [UserController::class, 'updatePermissions']);
+        Route::get('/users/{user}/customer-access', [CustomerAccessController::class, 'show']);
+        Route::put('/users/{user}/customer-access', [CustomerAccessController::class, 'update']);
+        Route::get('/users/{user}/customer-access/options', [CustomerAccessController::class, 'options']);
         Route::patch('/users/{user}/toggle-active', [UserController::class, 'toggleActive']);
     });
 });

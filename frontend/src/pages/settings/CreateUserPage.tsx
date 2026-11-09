@@ -36,7 +36,7 @@ const schema = z.object({
     .min(8, 'کلمه عبور باید حداقل ۸ کاراکتر باشد')
     .regex(/^(?=.*[a-zA-Z])(?=.*\d)/, 'کلمه عبور باید شامل حروف انگلیسی و اعداد باشد'),
   is_active: z.boolean(),
-  user_type: z.enum(['administrator', 'manager']),
+  user_type: z.enum(['administrator', 'manager', 'salesperson', 'installer']),
 })
 
 type CreateUserFormValues = z.infer<typeof schema>
@@ -116,6 +116,7 @@ export default function CreateUserPage() {
       formData.append('avatar', avatarFile)
     }
 
+    formData.append('sync_permissions', '1')
     selectedPerms.forEach((p) => {
       formData.append('permissions[]', p)
     })
@@ -249,6 +250,12 @@ export default function CreateUserPage() {
                 </div>
               </label>
 
+              {isAdministrator && (['salesperson', 'installer'] as const).map((role) => (
+                <label key={role} className="flex items-center gap-3 rounded-xl border p-3 cursor-pointer">
+                  <input type="radio" value={role} className="radio radio-primary radio-sm" {...register('user_type', { onChange: () => setSelectedPerms(role === 'salesperson' ? ['customers.view', 'customers.create', 'customers.edit', 'parts.view', 'parts.assign'] : ['customers.view', 'parts.view', 'parts.history']) })} />
+                  <span>{role === 'salesperson' ? 'کارمند فروش' : 'نصاب'}</span>
+                </label>
+              ))}
               {isAdministrator && (
                 <label
                   className={cx(

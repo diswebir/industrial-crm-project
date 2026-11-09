@@ -18,4 +18,10 @@ abstract class Controller
     {
         return DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
     }
+
+    /** Do not reveal whether an out-of-scope customer ID exists. */
+    protected function authorizeCustomer(\App\Models\Customer $customer): void
+    {
+        abort_unless(\App\Models\Customer::visibleTo(auth()->user())->whereKey($customer->id)->exists(), 404);
+    }
 }

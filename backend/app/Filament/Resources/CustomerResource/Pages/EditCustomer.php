@@ -13,7 +13,11 @@ class EditCustomer extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            Actions\DeleteAction::make()
+                ->using(function ($record): bool {
+                    app(\App\Services\Customers\CustomerService::class)->deleteCustomer($record, auth()->user());
+                    return true;
+                }),
         ];
     }
 }

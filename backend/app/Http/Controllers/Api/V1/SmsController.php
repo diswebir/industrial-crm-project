@@ -30,7 +30,7 @@ class SmsController extends Controller
         ]);
 
         $customer = isset($validated['customer_id'])
-            ? Customer::find($validated['customer_id'])
+            ? Customer::visibleTo($request->user())->findOrFail($validated['customer_id'])
             : null;
 
         $result = $this->melipayamakService->sendPattern(
@@ -56,6 +56,10 @@ class SmsController extends Controller
         $this->authorizePermission('sms.logs');
 
         $query = SmsLog::with('customer')->latest();
+        $user = $request->user();
+        if ($user->hasRestrictedCustomers() && !$user->customer_access_all) {
+            $query->whereHas('customer', fn ($customers) => $customers->visibleTo($user));
+        }
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);

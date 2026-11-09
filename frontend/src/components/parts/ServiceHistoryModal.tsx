@@ -111,7 +111,7 @@ export function ServiceHistoryModal({ open, onClose, customerPart, onSuccess }: 
           </Field>
         </div>
 
-        <Field label="شرح خدمات انجام‌شده و قطعات مصرفی" required error={errors.description?.message}>
+        <Field label="شرح خدمات انجام‌شده و دستگاه‌ها مصرفی" required error={errors.description?.message}>
           <textarea
             rows={3}
             className="textarea textarea-bordered w-full"
@@ -120,7 +120,7 @@ export function ServiceHistoryModal({ open, onClose, customerPart, onSuccess }: 
           />
         </Field>
 
-        <Field label="هزینه سرویس / قطعه (تومان - در صورت شمول)">
+        <Field label="هزینه سرویس / دستگاه (تومان - در صورت شمول)">
           <input
             type="number"
             dir="ltr"

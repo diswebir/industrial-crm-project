@@ -18,6 +18,7 @@ header('Content-Type: text/html; charset=utf-8');
 header('X-Robots-Tag: noindex');
 header('Cache-Control: no-store');
 header('Referrer-Policy: no-referrer');
+header("Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'");
 
 $baseDir = require __DIR__ . '/resolve-private.php';
 $envPath = $baseDir . '/.env';
@@ -74,7 +75,7 @@ $provided = isset($_POST['key']) ? trim((string) $_POST['key']) : '';
 
 if ($provided === '' ) {
     echo page('کلید لازم است', '<div class="note">ابتدا از دیتابیس بکاپ بگیرید. کلید APP_KEY را فقط در فرم زیر وارد کنید، نه در URL.</div>'
-        . '<form method="post"><input type="password" name="key" required autocomplete="off"><button>اجرای مایگریشن‌ها</button></form>');
+        . '<form method="post"><input type="password" name="key" required autocomplete="off"><label><input style="width:auto" type="checkbox" name="backup_confirm" value="1" required> نسخه پشتیبان کامل تهیه و امکان بازگردانی آن را بررسی کرده‌ام.</label><p><button>اجرای مایگریشن‌ها</button></p></form>');
     exit;
 }
 if (!hash_equals($appKey, $provided)) {
@@ -83,16 +84,18 @@ if (!hash_equals($appKey, $provided)) {
     exit;
 }
 
-/* ─── GET: وضعیت مایگریشن‌ها + دکمه اجرا ─── */
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    Illuminate\Support\Facades\Artisan::call('migrate:status');
-    $status = Illuminate\Support\Facades\Artisan::output();
-    echo page('وضعیت مایگریشن‌ها',
-        '<div class="note">وضعیت فعلی جدول‌های دیتابیس (Pending = مایگریشن‌هایی که اجرا نشده‌اند):</div>'
-        . '<pre>' . e($status) . '</pre>'
-        . '<form method="post"><input type="hidden" name="key" value="' . e($appKey) . '">'
-        . '<button type="submit">▶ اجرای مایگریشن‌های اجرانشده (migrate --force)</button></form>'
-        . '<div class="note">💡 قبل از اجرا از دیتابیس بکاپ بگیر (phpMyAdmin → Export).</div>');
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' || ($_POST['backup_confirm'] ?? '') !== '1') {
+    http_response_code(400);
+    echo page('تأیید پشتیبان لازم است', 'پیش از ارتقا نسخه پشتیبان کامل تهیه و بازگردانی آن را بررسی کنید.');
+    exit;
+}
+
+// Migration operations must not overlap, even when two browser requests arrive.
+$lock = @fopen($baseDir . '/storage/framework/upgrade.lock', 'c');
+if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {
+    if (is_resource($lock)) fclose($lock);
+    http_response_code(503);
+    echo page('ارتقا در دست اجراست', 'قفل ارتقا در دسترس نیست. پس از بررسی وضعیت و مجوز پوشه storage دوباره تلاش کنید.');
     exit;
 }
 
@@ -103,11 +106,16 @@ try {
     }
     $out = Illuminate\Support\Facades\Artisan::output();
 } catch (Throwable $e) {
-    echo page('خطا', '❌ اجرای مایگریشن خطا داد:<pre>' . e($e->getMessage()) . '</pre>');
+    flock($lock, LOCK_UN);
+    fclose($lock);
+    http_response_code(500);
+    echo page('خطا', '❌ اجرای مایگریشن خطا داد. ممکن است تغییرات ساختاری MySQL تا حدی اعمال شده باشند؛ پیش از تلاش دوباره وضعیت و پشتیبان را بررسی کنید.<pre>' . e($e->getMessage()) . '</pre>');
     exit;
 }
 
 $selfDeleted = @unlink(__FILE__);
+flock($lock, LOCK_UN);
+fclose($lock);
 
 echo page('بروزرسانی انجام شد ✅',
     '<pre>' . e($out) . '</pre>'

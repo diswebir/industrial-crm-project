@@ -28,11 +28,11 @@ import { cx, num } from '../utils/format'
 import type { Part } from '../types'
 
 const schema = z.object({
-  name: z.string().trim().min(2, 'نام قطعه را وارد کنید'),
+  name: z.string().trim().min(2, 'نام دستگاه را وارد کنید'),
   code: z
     .string()
     .trim()
-    .min(2, 'کد قطعه (SKU) را وارد کنید')
+    .min(2, 'کد دستگاه (SKU) را وارد کنید')
     .regex(/^[a-zA-Z0-9]+$/, 'کد SKU فقط می‌تواند شامل حروف انگلیسی و اعداد باشد'),
   periodic_service_months: z.number().min(1, 'دوره سرویس باید حداقل ۱ ماه باشد'),
   description: z.string().trim().optional(),
@@ -110,7 +110,7 @@ export default function Parts() {
       setDeletingPart(null)
     },
     onError: (err: any) => {
-      toast.error(err.response?.data?.message || 'خطا در حذف قطعه')
+      toast.error(err.response?.data?.message || 'خطا در حذف دستگاه')
     },
   })
 
@@ -127,19 +127,19 @@ export default function Parts() {
       qc.invalidateQueries({ queryKey: ['dashboard-stats'] })
       setModalOpen(false)
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'خطا در ذخیره قطعه')
+      toast.error(err.response?.data?.message || 'خطا در ذخیره دستگاه')
     }
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="کاتالوگ و مدیریت قطعات تولیدی"
-        subtitle="تعریف مدل‌های قطعات، زمان‌بندی پوشش سرویس دوره‌ای/گارانتی و آمار تخصیص"
+        title="کاتالوگ و مدیریت دستگاه‌ها تولیدی"
+        subtitle="تعریف مدل‌های دستگاه‌ها، زمان‌بندی پوشش سرویس دوره‌ای/گارانتی و آمار تخصیص"
         actions={
           <Can permission="parts.manage">
             <button className="btn btn-sm btn-primary gap-1.5" onClick={openCreate}>
-              <Plus className="size-4" /> تعریف قطعه جدید
+              <Plus className="size-4" /> تعریف دستگاه جدید
             </button>
           </Can>
         }
@@ -149,9 +149,9 @@ export default function Parts() {
       <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-xs text-blue-950 flex items-start gap-3 dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-200">
         <Wrench className="size-5 shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
         <div className="space-y-1">
-          <p className="font-bold text-sm">راهنمای سرویس دوره‌ای و ضمانت قطعات</p>
+          <p className="font-bold text-sm">راهنمای سرویس دوره‌ای و ضمانت دستگاه‌ها</p>
           <p className="opacity-90 leading-relaxed">
-            دوره سرویس هر قطعه نشان‌دهنده مدت زمان پوشش بازبینی و گارانتی دوره‌ای توسط شرکت است. با تخصیص قطعه به هر مشتری و
+            دوره سرویس هر دستگاه نشان‌دهنده مدت زمان پوشش بازبینی و گارانتی دوره‌ای توسط شرکت است. با تخصیص دستگاه به هر مشتری و
             صدور شماره سریال یکتا، تاریخ پایان گارانتی بر مبنای این دوره محاسبه و در پرونده مشتری ثبت می‌گردد.
           </p>
         </div>
@@ -173,7 +173,7 @@ export default function Parts() {
           />
         </div>
         <p className="text-xs text-base-content/60 self-end sm:self-center">
-          {num(parts.length)} مدل قطعه در کاتالوگ
+          {num(parts.length)} مدل دستگاه در کاتالوگ
         </p>
       </div>
 
@@ -183,12 +183,12 @@ export default function Parts() {
           <TableSkeleton rows={5} cols={5} />
         ) : !parts.length ? (
           <EmptyState
-            title="قطعه‌ای یافت نشد"
-            subtitle={q ? `هیچ موردی مطابق با جستجوی «${q}» پیدا نشد.` : 'مدل‌های قطعات تولیدی کارخانه را تعریف کنید تا بتوانید آن‌ها را با شماره سریال به مشتریان تخصیص دهید.'}
+            title="دستگاه‌ای یافت نشد"
+            subtitle={q ? `هیچ موردی مطابق با جستجوی «${q}» پیدا نشد.` : 'مدل‌های دستگاه‌ها تولیدی کارخانه را تعریف کنید تا بتوانید آن‌ها را با شماره سریال به مشتریان تخصیص دهید.'}
             action={
               <Can permission="parts.manage">
                 <button className="btn btn-sm btn-primary" onClick={openCreate}>
-                  <Plus className="size-4" /> تعریف اولین قطعه
+                  <Plus className="size-4" /> تعریف اولین دستگاه
                 </button>
               </Can>
             }
@@ -198,10 +198,10 @@ export default function Parts() {
             <table className="table table-hover">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-900/60 text-xs font-bold text-base-content/75 border-b border-base-200">
-                  <th>نام و مشخصات قطعه</th>
+                  <th>نام و مشخصات دستگاه</th>
                   <th>کد فنی (SKU)</th>
                   <th>دوره پوشش سرویس / گارانتی</th>
-                  <th>تعداد قطعات تحویل‌شده به مشتریان</th>
+                  <th>تعداد دستگاه‌ها تحویل‌شده به مشتریان</th>
                   <th>وضعیت تولید</th>
                   <th className="text-end">عملیات</th>
                 </tr>
@@ -258,14 +258,14 @@ export default function Parts() {
                         <Can permission="parts.manage">
                           <button
                             className="btn btn-ghost btn-xs btn-square"
-                            title="ویرایش قطعه"
+                            title="ویرایش دستگاه"
                             onClick={() => openEdit(p)}
                           >
                             <Pencil className="size-4" />
                           </button>
                           <button
                             className="btn btn-ghost btn-xs btn-square text-error hover:bg-error/10"
-                            title="حذف قطعه"
+                            title="حذف دستگاه"
                             onClick={() => setDeletingPart(p)}
                           >
                             <Trash2 className="size-4" />
@@ -286,7 +286,7 @@ export default function Parts() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         size="md"
-        title={editingPart ? 'ویرایش مدل قطعه' : 'تعریف مدل جدید در کاتالوگ قطعات'}
+        title={editingPart ? 'ویرایش مدل دستگاه' : 'تعریف مدل جدید در کاتالوگ دستگاه‌ها'}
         footer={
           <>
             <button type="button" className="btn btn-ghost" onClick={() => setModalOpen(false)} disabled={isSubmitting}>
@@ -300,7 +300,7 @@ export default function Parts() {
         }
       >
         <form id="part-modal-form" onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
-          <Field label="نام مدل قطعه" required error={errors.name?.message}>
+          <Field label="نام مدل دستگاه" required error={errors.name?.message}>
             <input
               className="input input-bordered w-full"
               placeholder="مثال: پمپ پیستونی هیدرولیک فشار قوی"
@@ -345,7 +345,7 @@ export default function Parts() {
             </Field>
           </div>
 
-          <Field label="توضیحات و مشخصات فنی قطعه">
+          <Field label="توضیحات و مشخصات فنی دستگاه">
             <textarea
               rows={3}
               className="textarea textarea-bordered w-full"
@@ -357,7 +357,7 @@ export default function Parts() {
           <div className="form-control">
             <label className="label cursor-pointer justify-start gap-3">
               <input type="checkbox" className="toggle toggle-primary toggle-sm" {...register('is_active')} />
-              <span className="label-text font-bold text-xs">قطعه فعال و در خط تولید کارخانه است</span>
+              <span className="label-text font-bold text-xs">دستگاه فعال و در خط تولید کارخانه است</span>
             </label>
           </div>
         </form>
@@ -368,8 +368,8 @@ export default function Parts() {
         open={Boolean(deletingPart)}
         onClose={() => setDeletingPart(null)}
         onConfirm={() => deletingPart && deleteMutation.mutate(deletingPart.id)}
-        title="حذف قطعه از کاتالوگ"
-        message={`آیا از حذف مدل قطعه «${deletingPart?.name}» اطمینان دارید؟`}
+        title="حذف دستگاه از کاتالوگ"
+        message={`آیا از حذف مدل دستگاه «${deletingPart?.name}» اطمینان دارید؟`}
         confirmText="بله، حذف کن"
         tone="error"
         loading={deleteMutation.isPending}

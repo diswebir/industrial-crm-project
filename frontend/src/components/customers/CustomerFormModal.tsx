@@ -8,21 +8,22 @@ import { Field } from '../ui/Field'
 import { SearchableSelect } from '../ui/SearchableSelect'
 import { customerApi } from '../../services/api'
 import { IRAN_PROVINCES, getCitiesByProvince } from '../../data/iranLocations'
-import { cx } from '../../utils/format'
+import { cx, toEnDigits } from '../../utils/format'
 import type { Customer } from '../../types'
 
 const schema = z
   .object({
     customer_type: z.enum(['potential', 'effective']),
     type: z.enum(['individual', 'company']),
-    first_name: z.string().trim().min(2, 'نام باید حداقل ۲ کاراکتر باشد'),
-    last_name: z.string().trim().min(2, 'نام خانوادگی باید حداقل ۲ کاراکتر باشد'),
+    first_name: z.string().trim(),
+    last_name: z.string().trim(),
     company_name: z.string().trim().optional(),
     national_code: z.string().trim().optional(),
     mobile: z
       .string()
       .trim()
-      .regex(/^09\d{9}$/, 'شماره همراه باید ۱۱ رقم عددی بوده و با 09 شروع شود (مثال: 09121234567)'),
+      .regex(/^09\d{9}$/, 'شماره همراه باید ۱۱ رقم عددی بوده و با 09 شروع شود (مثال: 09121234567)')
+      .or(z.literal('')),
     phone: z
       .string()
       .trim()
@@ -36,6 +37,12 @@ const schema = z
     notes: z.string().trim().optional(),
   })
   .superRefine((data, ctx) => {
+    if (data.type === 'individual') {
+      if (!data.first_name) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['first_name'], message: 'نام الزامی است' })
+      if (!data.last_name) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['last_name'], message: 'نام خانوادگی الزامی است' })
+    } else if (!data.company_name) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['company_name'], message: 'نام شرکت الزامی است' })
+    }
     if (data.national_code && data.national_code.length > 0) {
       if (data.type === 'individual') {
         if (!/^\d{10}$/.test(data.national_code)) {
@@ -99,11 +106,11 @@ export function CustomerFormModal({ open, onClose, customer, onSuccess }: Custom
         reset({
           customer_type: customer.customer_type,
           type: customer.type,
-          first_name: customer.first_name,
-          last_name: customer.last_name,
+          first_name: customer.first_name ?? '',
+          last_name: customer.last_name ?? '',
           company_name: customer.company_name ?? '',
           national_code: customer.national_code ?? '',
-          mobile: customer.mobile,
+          mobile: customer.mobile ?? '',
           phone: customer.phone ?? '',
           email: customer.email ?? '',
           province: customer.province ?? 'تهران',
@@ -219,10 +226,10 @@ export function CustomerFormModal({ open, onClose, customer, onSuccess }: Custom
 
         {/* Name Fields */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="نام" required error={errors.first_name?.message}>
+          <Field label="نام" required={type === 'individual'} error={errors.first_name?.message}>
             <input className="input input-bordered w-full" {...register('first_name')} placeholder="مثال: حمید" />
           </Field>
-          <Field label="نام خانوادگی" required error={errors.last_name?.message}>
+          <Field label="نام خانوادگی" required={type === 'individual'} error={errors.last_name?.message}>
             <input className="input input-bordered w-full" {...register('last_name')} placeholder="مثال: رضایی" />
           </Field>
         </div>
@@ -230,7 +237,7 @@ export function CustomerFormModal({ open, onClose, customer, onSuccess }: Custom
         {/* Company & National Code */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {type === 'company' && (
-            <Field label="نام شرکت / کارگاه" error={errors.company_name?.message}>
+            <Field label="نام شرکت / کارگاه" required error={errors.company_name?.message}>
               <input className="input input-bordered w-full" {...register('company_name')} placeholder="نام ثبتی شرکت" />
             </Field>
           )}
@@ -245,8 +252,9 @@ export function CustomerFormModal({ open, onClose, customer, onSuccess }: Custom
               className="input input-bordered w-full text-start font-mono"
               placeholder={type === 'company' ? 'مثال: 10100123456' : 'مثال: 0012345678'}
               {...register('national_code', {
+                setValueAs: (value) => toEnDigits(value).replace(/\D/g, ''),
                 onChange: (e) => {
-                  e.target.value = e.target.value.replace(/\D/g, '')
+                  e.target.value = toEnDigits(e.target.value).replace(/\D/g, '')
                 },
               })}
               onKeyDown={(e) => {
@@ -257,7 +265,7 @@ export function CustomerFormModal({ open, onClose, customer, onSuccess }: Custom
                 ) {
                   return
                 }
-                if (!/^\d$/.test(e.key)) {
+                if (!/^[0-9۰-۹٠-٩]$/.test(e.key)) {
                   e.preventDefault()
                 }
               }}
@@ -267,15 +275,16 @@ export function CustomerFormModal({ open, onClose, customer, onSuccess }: Custom
 
         {/* Contact Numbers */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Field label="شماره همراه (۱۱ رقم با 09)" required error={errors.mobile?.message}>
+          <Field label="شماره همراه (۱۱ رقم با 09)" error={errors.mobile?.message}>
             <input
               dir="ltr"
               maxLength={11}
               className="input input-bordered w-full text-start font-mono"
               placeholder="09123456789"
               {...register('mobile', {
+                setValueAs: (value) => toEnDigits(value).replace(/\D/g, ''),
                 onChange: (e) => {
-                  e.target.value = e.target.value.replace(/\D/g, '')
+                  e.target.value = toEnDigits(e.target.value).replace(/\D/g, '')
                 },
               })}
               onKeyDown={(e) => {
@@ -286,7 +295,7 @@ export function CustomerFormModal({ open, onClose, customer, onSuccess }: Custom
                 ) {
                   return
                 }
-                if (!/^\d$/.test(e.key)) {
+                if (!/^[0-9۰-۹٠-٩]$/.test(e.key)) {
                   e.preventDefault()
                 }
               }}
@@ -299,8 +308,9 @@ export function CustomerFormModal({ open, onClose, customer, onSuccess }: Custom
               className="input input-bordered w-full text-start font-mono"
               placeholder="02188776655"
               {...register('phone', {
+                setValueAs: (value) => toEnDigits(value).replace(/\D/g, ''),
                 onChange: (e) => {
-                  e.target.value = e.target.value.replace(/\D/g, '')
+                  e.target.value = toEnDigits(e.target.value).replace(/\D/g, '')
                 },
               })}
               onKeyDown={(e) => {
@@ -311,7 +321,7 @@ export function CustomerFormModal({ open, onClose, customer, onSuccess }: Custom
                 ) {
                   return
                 }
-                if (!/^\d$/.test(e.key)) {
+                if (!/^[0-9۰-۹٠-٩]$/.test(e.key)) {
                   e.preventDefault()
                 }
               }}
@@ -345,7 +355,7 @@ export function CustomerFormModal({ open, onClose, customer, onSuccess }: Custom
         </div>
 
         <Field label="آدرس پستی">
-          <textarea rows={2} className="textarea textarea-bordered w-full" {...register('address')} placeholder="آدرس کارخانه یا محل نصب قطعات..." />
+          <textarea rows={2} className="textarea textarea-bordered w-full" {...register('address')} placeholder="آدرس کارخانه یا محل نصب دستگاه‌ها..." />
         </Field>
 
         <Field label="یادداشت و توضیحات">

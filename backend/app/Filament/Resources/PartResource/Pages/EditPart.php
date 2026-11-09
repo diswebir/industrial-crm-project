@@ -13,7 +13,7 @@ class EditPart extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            // Deletion is only available through the guarded API.
         ];
     }
 }

@@ -27,6 +27,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->user_type === 'administrator';
     }
 
+    public function hasRestrictedCustomers(): bool
+    {
+        return in_array($this->user_type, ['salesperson', 'installer'], true);
+    }
+
     /**
      * The attributes that are mass assignable.
      *
@@ -80,6 +85,7 @@ class User extends Authenticatable implements FilamentUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'customer_access_all' => 'boolean',
             'user_type' => 'string',
         ];
     }

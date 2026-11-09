@@ -161,8 +161,16 @@ export const partApi = {
     const { data } = await http.delete<{ message: string }>(`/parts/${id}`)
     return data
   },
-  assignPart: async (customerId: number | string, body: { part_id: number | string; serial_number: string; installation_date?: string; notes?: string }) => {
+  assignPart: async (customerId: number | string, body: { part_id: number | string; serial_number: string; quantity: number; invoice_amount?: string | null; invoice_number?: string | null; installation_date?: string; notes?: string }) => {
     const { data } = await http.post<{ message: string; customer_part: CustomerPart; customer_type: string }>(`/customers/${customerId}/parts`, body)
+    return data
+  },
+  updateAssignment: async (id: number | string, body: { serial_number: string; quantity: number; invoice_amount?: string | null; invoice_number?: string | null; installation_date?: string | null; notes?: string }) => {
+    const { data } = await http.put<{ message: string; customer_part: CustomerPart }>(`/customer-parts/${id}`, body)
+    return data
+  },
+  deleteAssignment: async (id: number | string) => {
+    const { data } = await http.delete<{ message: string }>(`/customer-parts/${id}`)
     return data
   },
   addServiceHistory: async (customerPartId: number | string, body: { service_date: string; service_type: string; description: string; cost?: number }) => {

@@ -34,10 +34,11 @@ export const MAIN_NAV: NavGroup[] = [
     ],
   },
   {
-    title: 'مشتریان و قطعات',
+    title: 'مشتریان و دستگاه‌ها',
     items: [
       { to: '/customers', label: 'مدیریت مشتریان', icon: Users, permission: 'customers.view' },
-      { to: '/parts', label: 'کاتالوگ و تخصیص قطعات', icon: Cpu, permission: 'parts.view' },
+      { to: '/parts', label: 'کاتالوگ و تخصیص دستگاه‌ها', icon: Cpu, permission: 'parts.view' },
+      { to: '/inventory', label: 'انبار دستگاه‌ها', icon: Boxes, permission: 'parts.view' },
     ],
   },
   {

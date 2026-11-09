@@ -44,24 +44,25 @@ class CustomerResource extends Resource
                         'individual' => 'حقیقی (شخصی)',
                     ])
                     ->default('company')
+                    ->live()
                     ->required(),
                 Forms\Components\TextInput::make('first_name')
                     ->label('نام')
-                    ->required()
+                    ->required(fn (Forms\Get $get): bool => $get('type') === 'individual')
                     ->maxLength(255),
                 Forms\Components\TextInput::make('last_name')
                     ->label('نام خانوادگی')
-                    ->required()
+                    ->required(fn (Forms\Get $get): bool => $get('type') === 'individual')
                     ->maxLength(255),
                 Forms\Components\TextInput::make('company_name')
                     ->label('نام شرکت / سازمان')
+                    ->required(fn (Forms\Get $get): bool => $get('type') === 'company')
                     ->maxLength(255),
                 Forms\Components\TextInput::make('national_code')
                     ->label('کد ملی / شناسه ملی')
                     ->maxLength(20),
                 Forms\Components\TextInput::make('mobile')
                     ->label('شماره همراه')
-                    ->required()
                     ->maxLength(20),
                 Forms\Components\TextInput::make('phone')
                     ->label('تلفن ثابت')
@@ -128,11 +129,7 @@ class CustomerResource extends Resource
             ->actions([
                 Tables\Actions\EditAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
-            ]);
+            ->bulkActions([]);
     }
 
     public static function getRelations(): array

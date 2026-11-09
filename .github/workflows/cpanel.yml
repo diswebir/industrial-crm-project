@@ -52,6 +52,58 @@ jobs:
           SESSION_DRIVER: file
           CPANEL_INSTALL_PENDING: 'true'
         run: bash deploy/cpanel/tests/smoke-package.sh cpanel-release
+      - name: Install development dependencies for API tests
+        working-directory: backend
+        env:
+          APP_ENV: testing
+          APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ':memory:'
+          CPANEL_INSTALL_PENDING: 'true'
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: HTTP and XLSX integration checks on SQLite
+        working-directory: backend
+        env:
+          APP_ENV: testing
+          APP_DEBUG: 'false'
+          APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          DB_CONNECTION: sqlite
+          DB_DATABASE: /tmp/crm-ci-smoke.sqlite
+          CACHE_STORE: array
+          SESSION_DRIVER: array
+          CPANEL_INSTALL_PENDING: 'true'
+        run: |
+          touch "$DB_DATABASE"
+          php artisan migrate --force
+          php tests/smoke_customer_inventory.php
+      - name: API and inventory tests on MySQL
+        working-directory: backend
+        env:
+          APP_ENV: testing
+          APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: crm_test
+          DB_USERNAME: root
+          DB_PASSWORD: test_password
+          CPANEL_INSTALL_PENDING: 'true'
+        run: php vendor/bin/phpunit tests/Feature/CustomerInventoryTest.php
+      - name: MySQL upgrade with historical records
+        working-directory: backend
+        env:
+          APP_ENV: testing
+          APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: crm_upgrade_test
+          DB_USERNAME: root
+          DB_PASSWORD: test_password
+          CPANEL_INSTALL_PENDING: 'true'
+        run: |
+          mysql -h 127.0.0.1 -u root -ptest_password -e 'CREATE DATABASE crm_upgrade_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
+          php tests/migration_upgrade_mysql.php
       - name: Real installer GET/POST, failure diagnostics and retry tests
         env:
           CPANEL_INSTALLER_HTTP: '1'

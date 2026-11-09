@@ -19,22 +19,22 @@ class PartResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-cog-6-tooth';
 
-    protected static ?string $navigationLabel = 'قطعات';
+    protected static ?string $navigationLabel = 'دستگاه‌ها';
 
-    protected static ?string $modelLabel = 'قطعه';
+    protected static ?string $modelLabel = 'دستگاه';
 
-    protected static ?string $pluralModelLabel = 'قطعات';
+    protected static ?string $pluralModelLabel = 'دستگاه‌ها';
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
                 Forms\Components\TextInput::make('name')
-                    ->label('نام قطعه')
+                    ->label('نام دستگاه')
                     ->required()
                     ->maxLength(255),
                 Forms\Components\TextInput::make('code')
-                    ->label('کد فنی قطعه')
+                    ->label('کد فنی دستگاه')
                     ->required()
                     ->maxLength(255),
                 Forms\Components\TextInput::make('periodic_service_months')
@@ -58,7 +58,7 @@ class PartResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('id')->label('شناسه')->sortable(),
                 Tables\Columns\TextColumn::make('name')
-                    ->label('نام قطعه')
+                    ->label('نام دستگاه')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('code')
                     ->label('کد فنی')
@@ -85,11 +85,7 @@ class PartResource extends Resource
             ->actions([
                 Tables\Actions\EditAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
-            ]);
+            ->bulkActions([]);
     }
 
     public static function getRelations(): array

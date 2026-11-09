@@ -118,6 +118,8 @@ return '/home/alice/private_pro/project1/myc';
 
 ## ۵. ارتقا
 
+برای ارتقای نسخه ۲ و نکات مالکیت و موجودی افتتاحیه، راهنمای `UPGRADE-v2.md` را نیز بخوانید.
+
 از دیتابیس، `.env`، `storage/` خصوصی، `storage/` عمومی و `private-path.php` بکاپ بگیرید. هنگام جایگزینی فایل‌های نسخه جدید این موارد و قفل نصب را حفظ کنید؛ فایل `private-path.php` بسته جدید را روی تنظیم واقعی سرور overwrite نکنید. فایل‌های cache قبلی `bootstrap/cache/config.php`، `events.php` و `routes*.php` را قبل از اجرا حذف کنید. `update.php` را موقتاً آپلود، با HTTPS باز و APP_KEY را **فقط داخل فرم POST** وارد کنید، نه URL. پس از ارتقا آن را حذف کنید. ارتقا rollback خودکار ندارد و نباید `migrate:fresh` یا seed نمایشی اجرا شود.
 
 ## محدودیت تأیید

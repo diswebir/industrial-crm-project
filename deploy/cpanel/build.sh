@@ -124,6 +124,7 @@ printf "<?php\nreturn '/home/CPANEL_USER/private_pro/project1/myc';\n" > "$PUBLI
 mkdir -p "$PUBLIC/storage"
 printf 'Require all denied\n' > "$APP/.htaccess"
 cp "$ROOT/deploy/cpanel/README.md" "$APP/README-FIRST-cpanel.txt"
+cp "$ROOT/deploy/cpanel/UPGRADE-v2.md" "$APP/UPGRADE-v2.md"
 cp "$ROOT/deploy/cpanel/env.cpanel.example" "$APP/.env.cpanel.example"
 # The installer generates a unique APP_KEY on the destination, never at build time.
 sed -i.bak 's/__GENERATED_AT_BUILD__/__GENERATE_WITH_INSTALLER__/' "$APP/.env.cpanel.example"

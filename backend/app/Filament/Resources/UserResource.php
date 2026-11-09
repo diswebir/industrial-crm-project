@@ -54,6 +54,8 @@ class UserResource extends Resource
                     ->options([
                         'administrator' => 'مدیر ارشد (Administrator)',
                         'manager' => 'مدیر (Manager)',
+                        'salesperson' => 'کارمند فروش',
+                        'installer' => 'نصاب',
                     ])
                     ->default('manager')
                     ->required(),
@@ -111,11 +113,7 @@ class UserResource extends Resource
             ->actions([
                 Tables\Actions\EditAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
-            ]);
+            ->bulkActions([]);
     }
 
     public static function getRelations(): array
