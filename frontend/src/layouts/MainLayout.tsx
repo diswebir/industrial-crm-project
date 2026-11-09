@@ -59,7 +59,7 @@ function UserMenu() {
       >
         <span className="hidden text-end leading-tight whitespace-nowrap lg:block">
           <span className="block text-xs font-bold truncate max-w-[110px] xl:max-w-[150px]">{user.name}</span>
-          <span className="block text-[10px] text-base-content/60 truncate max-w-[110px] xl:max-w-[150px]">{roleLabel[user.role || 'admin']}</span>
+          <span className="block text-[10px] text-base-content/60 truncate max-w-[110px] xl:max-w-[150px]">{user.user_type ? ({ administrator: 'مدیر ارشد', manager: 'مدیر', salesperson: 'کارمند فروش', installer: 'نصاب' } as const)[user.user_type] : roleLabel[user.role || 'admin']}</span>
         </span>
         <Avatar name={user.name} src={user.avatar_url} size="md" presence="online" />
       </div>
