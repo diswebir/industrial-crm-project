@@ -115,13 +115,13 @@ try {
 
     [$status] = api($kernel, $token, 'PUT', '/api/v1/customer-parts/' . $assignmentId, ['serial_number' => 'SN' . $suffix, 'quantity' => 6]);
     check($status === 422 && $part->fresh()->stock_quantity === 3, 'insufficient stock rejected and rolled back');
-    [$status] = api($kernel, $token, 'PUT', '/api/v1/customer-parts/' . $assignmentId, ['serial_number' => 'SN' . $suffix, 'quantity' => 1]);
+    [$status] = api($kernel, $token, 'PUT', '/api/v1/customer-parts/' . $assignmentId, ['serial_number' => 'SN' . $suffix, 'quantity' => 1, 'return_confirmed' => true]);
     check($status === 200 && $part->fresh()->stock_quantity === 4, 'reducing quantity returns stock');
     [$status] = api($kernel, $token, 'DELETE', '/api/v1/customer-parts/' . $assignmentId);
-    check($status === 200 && $part->fresh()->stock_quantity === 5, 'deleting allocation returns stock');
+    check($status === 200 && $part->fresh()->stock_quantity === 4, 'archiving allocation does not return stock');
 
     $headings = HeadingRowFormatter::format((new CustomersTemplateExport())->headings());
-    $row = array_combine($headings, ['بالقوه', 'حقوقی', '', '', 'شرکت نمونه', '', '', '', '', '', '', '', '']);
+    $row = array_combine($headings, ['بالقوه', 'حقوقی', '', '', 'شرکت نمونه', '12345678901', '', '', '', '', '', '', '']);
     $import = new CustomersImport($a);
     $imported = $import->model($row);
     check($imported !== null && $imported->company_name === 'شرکت نمونه' && $imported->type === 'company', 'Persian template headings import a company without phone');

@@ -67,10 +67,10 @@ class CustomerInventoryTest extends TestCase
         $this->putJson('/api/v1/customer-parts/'.$assignment, ['serial_number' => 'SN01', 'quantity' => 6])->assertStatus(422);
         $this->assertSame(3, $part->fresh()->stock_quantity);
         $this->assertDatabaseHas('customer_parts', ['id' => $assignment, 'quantity' => 2]);
-        $this->putJson('/api/v1/customer-parts/'.$assignment, ['serial_number' => 'SN01', 'quantity' => 1])->assertOk();
+        $this->putJson('/api/v1/customer-parts/'.$assignment, ['serial_number' => 'SN01', 'quantity' => 1, 'return_confirmed' => true])->assertOk();
         $this->assertSame(4, $part->fresh()->stock_quantity);
         $this->deleteJson('/api/v1/customer-parts/'.$assignment)->assertOk();
-        $this->assertSame(5, $part->fresh()->stock_quantity);
+        $this->assertSame(4, $part->fresh()->stock_quantity);
         $this->assertSoftDeleted('customer_parts', ['id' => $assignment]);
     }
 
@@ -81,4 +81,31 @@ class CustomerInventoryTest extends TestCase
         $this->postJson('/api/v1/customers', ['customer_type' => 'potential', 'type' => 'company', 'company_name' => 'شرکت'])->assertCreated();
         $this->postJson('/api/v1/customers', ['customer_type' => 'potential', 'type' => 'individual'])->assertStatus(422);
     }
+    public function test_archiving_assignment_does_not_assume_physical_return(): void
+    {
+        $user = $this->employee('archive@example.test');
+        $customer = $this->customer($user, 'Company');
+        $part = Part::create(['name' => 'Device', 'code' => 'ARC', 'periodic_service_months' => 12, 'is_active' => true]);
+        Sanctum::actingAs($user);
+        $this->postJson('/api/v1/parts/'.$part->id.'/stock', ['type' => 'in', 'quantity' => 2])->assertCreated();
+        $assignment = $this->postJson('/api/v1/customers/'.$customer->id.'/parts', ['part_id' => $part->id, 'serial_number' => 'ARCH1', 'quantity' => 1])->assertCreated()->json('customer_part.id');
+        $this->deleteJson('/api/v1/customer-parts/'.$assignment)->assertOk();
+        $this->assertSame(1, $part->fresh()->stock_quantity);
+        $this->assertDatabaseMissing('inventory_logs', ['customer_part_id' => $assignment, 'type' => 'assignment_return']);
+    }
+
+    public function test_reducing_quantity_requires_confirmation_of_physical_return(): void
+    {
+        $user = $this->employee('return@example.test');
+        $customer = $this->customer($user, 'Company');
+        $part = Part::create(['name' => 'Device', 'code' => 'RET', 'periodic_service_months' => 12, 'is_active' => true]);
+        Sanctum::actingAs($user);
+        $this->postJson('/api/v1/parts/'.$part->id.'/stock', ['type' => 'in', 'quantity' => 2])->assertCreated();
+        $assignment = $this->postJson('/api/v1/customers/'.$customer->id.'/parts', ['part_id' => $part->id, 'serial_number' => 'RET1', 'quantity' => 2])->assertCreated()->json('customer_part.id');
+        $this->putJson('/api/v1/customer-parts/'.$assignment, ['serial_number' => 'RET1', 'quantity' => 1])->assertUnprocessable();
+        $this->assertSame(0, $part->fresh()->stock_quantity);
+        $this->putJson('/api/v1/customer-parts/'.$assignment, ['serial_number' => 'RET1', 'quantity' => 1, 'return_confirmed' => true])->assertOk();
+        $this->assertSame(1, $part->fresh()->stock_quantity);
+    }
+
 }

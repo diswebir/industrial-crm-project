@@ -55,7 +55,7 @@ class SmsController extends Controller
     {
         $this->authorizePermission('sms.logs');
 
-        $query = SmsLog::with('customer')->latest();
+        $query = SmsLog::with('customer')->where('pattern_code', '!=', 'NORMAL-OTP')->latest();
         $user = $request->user();
         if ($user->hasRestrictedCustomers() && !$user->customer_access_all) {
             $query->whereHas('customer', fn ($customers) => $customers->visibleTo($user));

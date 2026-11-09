@@ -4,6 +4,7 @@ on:
     paths: ["backend/**", "frontend/**", "deploy/cpanel/**", ".github/workflows/cpanel.yml"]
   workflow_dispatch:
   push:
+    branches: ["arena/7197db03-industrial-crm-project", "main"]
     tags: ['v*']
 permissions:
   contents: read
@@ -88,7 +89,9 @@ jobs:
           DB_USERNAME: root
           DB_PASSWORD: test_password
           CPANEL_INSTALL_PENDING: 'true'
-        run: php vendor/bin/phpunit tests/Feature/CustomerInventoryTest.php
+        run: |
+          php vendor/bin/phpunit tests/Feature/CustomerInventoryTest.php
+          php vendor/bin/phpunit tests/Feature/SecurityRegressionTest.php
       - name: Concurrent allocations on MySQL
         working-directory: backend
         env:
@@ -152,11 +155,20 @@ jobs:
             python3 -c 'from pathlib import Path; s=Path("installer-http-tests.log").read_text()[-20000:]; print("::error title=Installer HTTP test details::"+s.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))'
           fi
           exit "$status"
+      - name: Prepare download folder
+        run: |
+          mkdir -p cpanel-download
+          cp cpanel-release/cpanel-public.zip cpanel-release/cpanel-private.zip cpanel-release/SHA256SUMS cpanel-release/build-info.txt cpanel-download/
+          cp deploy/cpanel/README.md cpanel-download/راهنمای-نصب.txt
+          cp deploy/cpanel/UPGRADE-v2.md cpanel-download/راهنمای-ارتقا.txt
       - uses: actions/upload-artifact@v4
         with:
           name: cpanel-package
           path: |
-            cpanel-release/*.zip
-            cpanel-release/SHA256SUMS
-            cpanel-release/build-info.txt
+            cpanel-download/cpanel-public.zip
+            cpanel-download/cpanel-private.zip
+            cpanel-download/SHA256SUMS
+            cpanel-download/build-info.txt
+            cpanel-download/راهنمای-نصب.txt
+            cpanel-download/راهنمای-ارتقا.txt
           if-no-files-found: error

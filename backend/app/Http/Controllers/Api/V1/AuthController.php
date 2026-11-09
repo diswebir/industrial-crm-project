@@ -59,17 +59,15 @@ class AuthController extends Controller
         $smsText = "کد تأیید ورود شما به سامانه مدیریت ارتباط با مشتری: {$otpCode}\nاعتبار: ۲ دقیقه";
         $smsResult = $this->melipayamakService->sendNormalSms($phone, $smsText);
 
-        $response = [
-            'message' => 'کد تأیید ورود با موفقیت به شماره شما پیامک شد.',
-            'expires_in' => 120,
-        ];
-
-        if (!empty($smsResult['is_sandbox'])) {
-            $response['sandbox_code'] = $otpCode;
-            $response['message'] = "پیامک در حالت شبیه‌ساز (Sandbox) ثبت شد. کد ورود: {$otpCode}";
+        if (empty($smsResult['success']) || !empty($smsResult['is_sandbox'])) {
+            \Illuminate\Support\Facades\Cache::forget('otp_' . $phone);
+            return response()->json(['message' => 'ارسال کد ورود در دسترس نیست.'], 503);
         }
 
-        return response()->json($response);
+        return response()->json([
+            'message' => 'کد تأیید ورود با موفقیت به شماره شما پیامک شد.',
+            'expires_in' => 120,
+        ]);
     }
 
     /**
@@ -237,6 +235,9 @@ class AuthController extends Controller
         }
 
         $user->save();
+        if (!empty($validated['password'])) {
+            $user->tokens()->where('id', '!=', $user->currentAccessToken()?->id)->delete();
+        }
 
         $permissions = $user->getAllPermissions()->pluck('name')->values()->all();
 
@@ -279,7 +280,7 @@ class AuthController extends Controller
             minutes: 60 * 24 * 7, // 7 days
             path: '/',
             domain: null,
-            secure: false, // allow http in local/docker environment
+            secure: request()->isSecure() || app()->environment('production'),
             httpOnly: true,
             raw: false,
             sameSite: 'Lax'

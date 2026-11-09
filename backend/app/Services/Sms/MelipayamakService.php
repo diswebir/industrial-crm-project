@@ -28,10 +28,12 @@ class MelipayamakService
 
         $username = Setting::get('melipayamak_username') ?: env('MELIPAYAMAK_USERNAME');
         $password = Setting::get('melipayamak_password') ?: env('MELIPAYAMAK_PASSWORD');
-        $sandbox = Setting::get('melipayamak_sandbox', 'true') === 'true' || env('MELIPAYAMAK_SANDBOX', true);
+        $sandbox = filter_var(Setting::get('melipayamak_sandbox', env('MELIPAYAMAK_SANDBOX', true) ? 'true' : 'false'), FILTER_VALIDATE_BOOLEAN);
 
-        // If credentials are empty or sandbox mode is enabled, simulate dispatch
-        if ($sandbox || empty($username) || empty($password)) {
+        if (!$sandbox && (empty($username) || empty($password))) {
+            return ['success' => false, 'message_id' => null, 'status' => 'تنظیمات پیامک کامل نیست.', 'is_sandbox' => false];
+        }
+        if ($sandbox) {
             $fakeMessageId = 'SANDBOX-' . rand(10000000, 99999999);
             Log::info("Melipayamak Sandbox SMS to {$mobile} with Pattern {$bodyId}:", $tokens);
 
@@ -118,17 +120,19 @@ class MelipayamakService
         $username = Setting::get('melipayamak_username') ?: env('MELIPAYAMAK_USERNAME');
         $password = Setting::get('melipayamak_password') ?: env('MELIPAYAMAK_PASSWORD');
         $fromNumber = Setting::get('melipayamak_from') ?: env('MELIPAYAMAK_FROM', '5000...');
-        $sandbox = Setting::get('melipayamak_sandbox', 'true') === 'true' || env('MELIPAYAMAK_SANDBOX', true);
+        $sandbox = filter_var(Setting::get('melipayamak_sandbox', env('MELIPAYAMAK_SANDBOX', true) ? 'true' : 'false'), FILTER_VALIDATE_BOOLEAN);
 
-        // In sandbox mode or when credentials missing, log and simulate
-        if ($sandbox || empty($username) || empty($password)) {
+        if (!$sandbox && (empty($username) || empty($password))) {
+            return ['success' => false, 'message_id' => null, 'status' => 'تنظیمات پیامک کامل نیست.', 'is_sandbox' => false];
+        }
+        if ($sandbox) {
             $fakeMessageId = 'SANDBOX-OTP-' . rand(10000000, 99999999);
-            Log::info("Melipayamak Sandbox Normal SMS to {$mobile}: {$text}");
+            Log::info("Melipayamak Sandbox Normal SMS to {$mobile}");
 
             SmsLog::create([
                 'recipient_mobile' => $mobile,
                 'pattern_code' => 'NORMAL-OTP',
-                'tokens' => ['text' => $text],
+                'tokens' => ['text' => '[REDACTED]'],
                 'status' => 'sent',
                 'provider_message_id' => $fakeMessageId,
                 'error_message' => null,
@@ -162,7 +166,7 @@ class MelipayamakService
             SmsLog::create([
                 'recipient_mobile' => $mobile,
                 'pattern_code' => 'NORMAL-OTP',
-                'tokens' => ['text' => $text],
+                'tokens' => ['text' => '[REDACTED]'],
                 'status' => $isSuccess ? 'sent' : 'failed',
                 'provider_message_id' => $isSuccess ? (string)$val : null,
                 'error_message' => $isSuccess ? null : ($strStatus . ' (Code: ' . $val . ')'),
@@ -180,7 +184,7 @@ class MelipayamakService
             SmsLog::create([
                 'recipient_mobile' => $mobile,
                 'pattern_code' => 'NORMAL-OTP',
-                'tokens' => ['text' => $text],
+                'tokens' => ['text' => '[REDACTED]'],
                 'status' => 'failed',
                 'provider_message_id' => null,
                 'error_message' => $e->getMessage(),

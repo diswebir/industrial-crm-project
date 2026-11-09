@@ -129,6 +129,7 @@ class PartController extends Controller
         $validated = $request->validate([
             'serial_number' => ['required', 'string', 'max:100', 'regex:/^[a-zA-Z0-9]+$/', Rule::unique('customer_parts', 'serial_number')->ignore($customerPart->id)],
             'quantity' => 'required|integer|min:1|max:2147483647',
+            'return_confirmed' => 'sometimes|boolean',
             'invoice_amount' => 'nullable|numeric|min:0|max:999999999999.99|decimal:0,2',
             'invoice_number' => 'nullable|string|max:100',
             'installation_date' => 'nullable|date',
@@ -144,7 +145,7 @@ class PartController extends Controller
         $this->authorizePermission('parts.assign');
         $this->authorizeCustomer($customerPart->customer);
         $this->customerService->deleteAssignment($customerPart, $request->user());
-        return response()->json(['message' => 'تخصیص حذف و موجودی به انبار بازگردانده شد.']);
+        return response()->json(['message' => 'تخصیص بایگانی شد؛ موجودی انبار تغییر نکرد.']);
     }
 
     public function addServiceHistory(Request $request, CustomerPart $customerPart): JsonResponse

@@ -371,7 +371,7 @@ export default function Customers() {
         onClose={() => setDeleting(null)}
         onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
         title="حذف پرونده مشتری"
-        message={`آیا از حذف مشتری «${deleting?.first_name} ${deleting?.last_name}» اطمینان دارید؟ پرونده و تخصیص‌ها بایگانی و موجودی به انبار بازگردانده خواهد شد.`}
+        message={`آیا از حذف مشتری «${deleting?.first_name} ${deleting?.last_name}» اطمینان دارید؟ پرونده و تخصیص‌ها بایگانی می‌شوند و موجودی تغییر نمی‌کند؛ بازگشت فیزیکی را جداگانه در انبار ثبت کنید.`}
         confirmText="بله، حذف کن"
         tone="error"
         loading={deleteMutation.isPending}

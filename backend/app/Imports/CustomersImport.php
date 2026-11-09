@@ -49,7 +49,24 @@ class CustomersImport implements ToModel, WithHeadingRow, SkipsEmptyRows
             $this->errors[] = "شماره همراه «{$mobile}» نامعتبر است.";
             return null;
         }
-        $matches = $mobile !== '' ? Customer::where('mobile', $mobile)->limit(2)->get() : collect();
+        if ($phone !== '' && !preg_match('/^0\d{10}$/', $phone)) {
+            $this->errors[] = 'شماره تلفن ثابت نامعتبر است.';
+            return null;
+        }
+        $nationalLength = $personType === 'company' ? 11 : 10;
+        if ($nationalCode !== '' && !preg_match('/^\d{' . $nationalLength . '}$/', $nationalCode)) {
+            $this->errors[] = 'کد ملی یا شناسه ملی نامعتبر است.';
+            return null;
+        }
+        if ($email !== '' && (strlen($email) > 150 || !filter_var($email, FILTER_VALIDATE_EMAIL))) {
+            $this->errors[] = 'ایمیل نامعتبر است.';
+            return null;
+        }
+        if ($mobile === '' && $nationalCode === '') {
+            $this->errors[] = 'برای جلوگیری از ورود تکراری، شماره همراه یا شناسه ملی لازم است.';
+            return null;
+        }
+        $matches = Customer::where($mobile !== '' ? 'mobile' : 'national_code', $mobile !== '' ? $mobile : $nationalCode)->limit(2)->get();
         if ($matches->count() > 1) {
             $this->errors[] = 'شماره همراه در چند پرونده وجود دارد؛ سطر وارد نشد.';
             return null;
@@ -57,6 +74,11 @@ class CustomersImport implements ToModel, WithHeadingRow, SkipsEmptyRows
         $existing = $matches->first();
         if ($existing && !Customer::visibleTo($this->user)->whereKey($existing->id)->exists()) {
             $this->errors[] = 'یک سطر به دلیل نداشتن دسترسی به مشتری موجود وارد نشد.';
+            return null;
+        }
+
+        if ($existing && !$this->user->hasPermissionTo('customers.edit')) {
+            $this->errors[] = 'ویرایش مشتری موجود نیازمند مجوز ویرایش است.';
             return null;
         }
 
@@ -125,7 +147,7 @@ class CustomersImport implements ToModel, WithHeadingRow, SkipsEmptyRows
         $persian = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
         $arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
         $latin = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-        $num = preg_replace('/[^\\d]/', '', str_replace($arabic, $latin, str_replace($persian, $latin, $str)));
+        $num = str_replace($arabic, $latin, str_replace($persian, $latin, $str));
         if (str_starts_with($num, '989')) {
             $num = '0' . substr($num, 2);
         }

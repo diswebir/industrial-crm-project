@@ -175,6 +175,11 @@ class UserController extends Controller
             abort(403, 'مدیران عادی امکان ویرایش حساب مدیر ارشد را ندارند.');
         }
 
+        // Only administrators can change another user's credentials or identity.
+        if (!$callingUser->isAdministrator() && $user->id !== $callingUser->id) {
+            abort(403, 'ویرایش حساب کاربران دیگر فقط برای مدیر ارشد مجاز است.');
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:100',
             'email' => 'required|email|unique:users,email,' . $user->id,
@@ -228,6 +233,9 @@ class UserController extends Controller
         }
 
         $user->save();
+        if (!empty($validated['password']) || !$user->is_active) {
+            $user->tokens()->delete();
+        }
 
         // Handle user_type update: only administrators can change user_type
         $callingUser = auth()->user();
@@ -375,6 +383,9 @@ class UserController extends Controller
         }
 
         $user->update(['is_active' => !$user->is_active]);
+        if (!$user->is_active) {
+            $user->tokens()->delete();
+        }
 
         return response()->json([
             'message' => $user->is_active ? 'کاربر فعال شد.' : 'کاربر غیرفعال شد.',

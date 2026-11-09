@@ -44,7 +44,8 @@ export function AssignPartModal({ open, onClose, customer, onSuccess, assignment
     enabled: open,
   })
 
-  const today = new Date().toISOString().slice(0, 10)
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
   const {
     register,
@@ -90,7 +91,10 @@ export function AssignPartModal({ open, onClose, customer, onSuccess, assignment
 
   const onSubmit = async (values: FormValues) => {
     try {
+      const reducing = assignment && Number(toEnDigits(values.quantity)) < assignment.quantity
+      if (reducing && !window.confirm('آیا دستگاه‌های کسرشده واقعاً به انبار بازگشته‌اند؟')) return
       const fields = {
+        return_confirmed: Boolean(reducing),
         serial_number: values.serial_number,
         quantity: Number(toEnDigits(values.quantity)),
         invoice_amount: values.invoice_amount || null,

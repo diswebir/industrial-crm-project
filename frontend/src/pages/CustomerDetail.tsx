@@ -584,7 +584,7 @@ export default function CustomerDetail() {
         onClose={() => setDeleteAssignment(null)}
         onConfirm={() => deleteAssignment && deleteAssignmentMutation.mutate(deleteAssignment.id)}
         title="حذف تخصیص دستگاه"
-        message="تخصیص بایگانی و تعداد آن به موجودی انبار بازگردانده می‌شود. ادامه می‌دهید؟"
+        message="تخصیص بایگانی می‌شود و موجودی تغییر نمی‌کند. اگر دستگاه واقعاً برگشته است، ورود آن را جداگانه در انبار ثبت کنید. ادامه می‌دهید؟"
         danger
         loading={deleteAssignmentMutation.isPending}
       />

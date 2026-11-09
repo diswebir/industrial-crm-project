@@ -165,7 +165,7 @@ export const partApi = {
     const { data } = await http.post<{ message: string; customer_part: CustomerPart; customer_type: string }>(`/customers/${customerId}/parts`, body)
     return data
   },
-  updateAssignment: async (id: number | string, body: { serial_number: string; quantity: number; invoice_amount?: string | null; invoice_number?: string | null; installation_date?: string | null; notes?: string }) => {
+  updateAssignment: async (id: number | string, body: { serial_number: string; quantity: number; return_confirmed?: boolean; invoice_amount?: string | null; invoice_number?: string | null; installation_date?: string | null; notes?: string }) => {
     const { data } = await http.put<{ message: string; customer_part: CustomerPart }>(`/customer-parts/${id}`, body)
     return data
   },

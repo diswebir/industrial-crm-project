@@ -88,6 +88,10 @@ class CustomerService
             $newQuantity = (int) $attributes['quantity'];
             $difference = $newQuantity - $oldQuantity;
 
+            if ($difference < 0 && empty($attributes['return_confirmed'])) {
+                throw ValidationException::withMessages(['quantity' => ['برای کاهش تعداد، بازگشت فیزیکی دستگاه به انبار را تأیید کنید.']]);
+            }
+            unset($attributes['return_confirmed']);
             if ($difference !== 0) {
                 $this->inventory->apply($part, -$difference, $difference > 0 ? 'assignment_out' : 'assignment_return', $user, $customer, $assignment);
             }
@@ -116,7 +120,7 @@ class CustomerService
         }, 3);
     }
 
-    /** Customer deletion is logical and returns all active assignments to stock. */
+    /** Archive the customer and assignments without assuming physical return. */
     public function deleteCustomer(Customer $customer, User $user): void
     {
         DB::transaction(function () use ($customer, $user): void {
@@ -128,7 +132,7 @@ class CustomerService
             $customer->histories()->create([
                 'user_id' => $user->id,
                 'action' => 'customer_archived',
-                'description' => 'پرونده مشتری بایگانی و دستگاه‌های تخصیص‌یافته به انبار بازگردانده شد.',
+                'description' => 'پرونده مشتری و تخصیص‌ها بدون تغییر موجودی بایگانی شد.',
             ]);
             $customer->delete();
         }, 3);
@@ -136,12 +140,11 @@ class CustomerService
 
     private function returnAndArchive(CustomerPart $assignment, Customer $customer, User $user): void
     {
-        $part = Part::query()->whereKey($assignment->part_id)->lockForUpdate()->firstOrFail();
-        $this->inventory->apply($part, (int) $assignment->quantity, 'assignment_return', $user, $customer, $assignment);
+        $part = Part::query()->whereKey($assignment->part_id)->firstOrFail();
         $customer->histories()->create([
             'user_id' => $user->id,
             'action' => 'part_removed',
-            'description' => "تخصیص دستگاه «{$part->name}» حذف و موجودی به انبار بازگردانده شد.",
+            'description' => "تخصیص دستگاه «{$part->name}» بایگانی شد؛ موجودی تغییر نکرد.",
             'metadata' => ['customer_part_id' => $assignment->id, 'quantity' => $assignment->quantity],
         ]);
         $assignment->delete();

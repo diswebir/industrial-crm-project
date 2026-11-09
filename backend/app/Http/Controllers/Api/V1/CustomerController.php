@@ -77,8 +77,9 @@ class CustomerController extends Controller
         $this->authorizePermission('customers.edit');
         $this->authorizeCustomer($customer);
         $fields = ['customer_type', 'type', 'first_name', 'last_name', 'company_name', 'national_code', 'mobile', 'phone', 'email', 'province', 'city', 'address', 'notes'];
-        $validated = $this->validateCustomer(array_replace($customer->only($fields), $request->only($fields)));
-        DB::transaction(function () use ($customer, $validated, $request): void {
+        DB::transaction(function () use (&$customer, $fields, $request): void {
+            $customer = Customer::visibleTo($request->user())->whereKey($customer->id)->lockForUpdate()->firstOrFail();
+            $validated = $this->validateCustomer(array_replace($customer->only($fields), $request->only($fields)));
             $customer->update($validated);
             $customer->histories()->create([
                 'user_id' => $request->user()->id,
