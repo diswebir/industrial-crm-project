@@ -2,11 +2,12 @@ const { chromium } = require('playwright-core');
 (async () => {
  const browser = await chromium.launch({executablePath: process.env.CHROMIUM_PATH || '/usr/bin/google-chrome', args: ['--no-sandbox'], headless: true});
  const page = await browser.newPage({viewport:{width:390,height:844}});
- const errors=[]; page.on('pageerror', e=>errors.push(e.message));
+ const errors=[]; page.on('pageerror', e=>{errors.push(e.message); console.error('PAGE ERROR:', e.stack)});
  let signedIn=false, saved=null;
  await page.route('**/api/v1/**', async route=>{
   const req=route.request(), u=new URL(req.url()); let data={}; let status=200;
   if(u.pathname.endsWith('/auth/me')) {if(!signedIn){status=401;data={message:'Unauthenticated'}} else data={user:{id:1,name:'آزمایش',email:'test@example.com',user_type:'salesperson',permissions:['customers.view','customers.create','customers.edit','parts.view','parts.assign']}}}
+  else if(u.pathname.endsWith('/notifications')) data=[];
   else if(u.pathname.endsWith('/settings/company')) data={company_name:'آزمایش'};
   else if(u.pathname.endsWith('/customers/1')) data={id:1,first_name:null,last_name:null,full_name:'شرکت نمونه',company_name:'شرکت نمونه',type:'company',customer_type:'potential',customer_parts:[],histories:[],sms_logs:[]};
   else if(u.pathname.endsWith('/parts')) data=[{id:1,name:'دستگاه نمونه',code:'ABC',stock_quantity:10,periodic_service_months:12,is_active:true}];

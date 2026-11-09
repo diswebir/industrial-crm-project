@@ -8,7 +8,7 @@ const EMPTY: never[] = []
 /** Fetches a whole collection. `data` is always an array (stable empty ref while loading). */
 export function useList<K extends ResourceName>(resource: K) {
   const q = useQuery({ queryKey: [resource], queryFn: () => getAll(resource), staleTime: 20_000 })
-  return { ...q, data: (q.data ?? EMPTY) as Resources[K][] }
+  return { ...q, data: (Array.isArray(q.data) ? q.data : EMPTY) as Resources[K][] }
 }
 
 interface MutationOpts {
