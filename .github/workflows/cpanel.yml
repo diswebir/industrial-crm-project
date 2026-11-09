@@ -104,6 +104,16 @@ jobs:
         run: |
           mysql -h 127.0.0.1 -u root -ptest_password -e 'CREATE DATABASE crm_upgrade_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
           php tests/migration_upgrade_mysql.php
+      - name: Mobile browser smoke with mocked API
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm install --no-save --no-audit --no-fund playwright-core@1.56.1
+          npm run dev -- --host 127.0.0.1 > /tmp/crm-vite.log 2>&1 &
+          server=$!
+          trap 'kill "$server" || true' EXIT
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:5173/ >/dev/null && break; sleep 1; done
+          node tests/browser-smoke.cjs
       - name: Real installer GET/POST, failure diagnostics and retry tests
         env:
           CPANEL_INSTALLER_HTTP: '1'

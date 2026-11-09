@@ -41,6 +41,6 @@ const apiProxy = {
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  server: { proxy: apiProxy, host: true, port: 5173 },
-  preview: { proxy: apiProxy, host: true, port: 5173 },
+  server: { proxy: apiProxy, host: true, port: 5173, allowedHosts: ['.e2b.app'] },
+  preview: { proxy: apiProxy, host: true, port: 5173, allowedHosts: ['.e2b.app'] },
 })
