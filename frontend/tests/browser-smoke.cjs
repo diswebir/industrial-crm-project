@@ -31,7 +31,7 @@ const { chromium } = require('playwright-core');
  console.log('PASS calendar opens inside modal and today is clickable on mobile');
  await dialog.getByRole('button',{name:'انصراف'}).click();
  await page.goto('http://127.0.0.1:5173/customers');
- const add=page.getByRole('button',{name:/ثبت مشتری جدید/}).first(); await add.click();
+ const add=page.getByRole('button',{name:/مشتری جدید/}).first(); await add.click();
  const form=page.locator('dialog[open]'); await form.getByText('حقوقی (شرکت/کارگاه)').click();
  await form.locator('input[name=company_name]').fill('شرکت بدون شماره');
  await form.getByRole('button',{name:'ثبت مشتری',exact:true}).click();
