@@ -39,6 +39,19 @@
 
 تست‌های doubles به تنهایی آزمون Laravel نیستند؛ workflow جداگانه بسته واقعی را با PHP و دیتابیس اجرا کرده است. تست ZIP شامل مسیر نسبی و دارای فاصله، حفظ سورس و .env، شکست Composer/npm/lint، قفل هم‌زمان، رد symlink، فایل حساس، zip-slip و ZIP خراب است.
 
+## تغییرات آزمون‌ها در نسخه ۲٫۰٫۰
+
+ردیف «۱۴ مجوز» در جدول بالا، نتیجه واقعی CI در همان نسخه است و به‌عنوان سند تاریخی دست‌نخورده باقی مانده است. از نسخه `v2.0.0` شمار مجوزها **۱۶** است (`inventory.manage` و `inventory.logs` افزوده شدند) و آزمون‌ها به این شکل به‌روز شدند:
+
+| آزمون | تغییر |
+|---|---|
+| `tests/smoke-package.php` | راستی‌آزمایی ۱۶ مجوز، جدول‌های `inventory_logs` / `user_staff_access` / `user_customer_access`، ستون‌های موجودی و تخصیص، و اجرای دوباره مایگریشن‌ها (Idempotent) |
+| `tests/test_installer_http.py` | ادعای پیشین «دقیقاً ۱۴ مجوز» به «مدیر نصب‌شده باید **همه** مجوزهای ثبت‌شده را داشته باشد و شمار آن‌ها کمتر از ۱۶ نباشد» تغییر کرد تا در نسخه‌های بعدی با افزودن مجوز جدید نشکند |
+| `tests/test_build.py` | fixture بسته، فایل‌های `public/css/vazirmatn.css` و پنج فونت `public/fonts/vazirmatn-fd-*.woff2` را هم می‌سازد و حضور `css/vazirmatn.css` و `fonts/vazirmatn-fd-Regular.woff2` در ZIP عمومی را بررسی می‌کند |
+| `build.sh` | کپی `backend/public/css` و `backend/public/fonts` در بسته + دو بررسی اجباری پیش از بسته‌بندی (رفع باگ B13) |
+
+اسکریپت خام `database/v2.0.0-mysql.sql` عمداً داخل بسته‌ها قرار نمی‌گیرد؛ `verify-package.sh` هر فایل `.sql` را به‌عنوان ریسک نشتی داده رد می‌کند.
+
 ## موارد اجرا نشده و ریسک‌های باقی‌مانده
 
 - PHP و Composer در sandbox نصب نیستند؛ اجرای واقعی Composer، Laravel، ساخت ZIP و مایگریشن‌ها در GitHub Actions انجام و موفق شد. PHPUnit و composer audit اجرا نشده‌اند. نصب مستقیم ویندوز/WSL روی رایانه کاربر هنوز آزمایش نشده است.

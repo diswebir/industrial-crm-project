@@ -115,7 +115,11 @@ $db=getenv('TEST_DB_NAME');$pdo->exec("DROP DATABASE IF EXISTS `$db`");$pdo->exe
         self.assertTrue((self.private/'storage/installed.lock').is_file())
         self.assertFalse((self.public/'install.php').exists())
         self.assertIn('CPANEL_INSTALL_PENDING=false', (self.private/'.env').read_text())
-        # Confirm the actual posted admin password survived parsing/hashing.
+        # Confirm the actual posted admin password survived parsing/hashing, and that the
+        # installer granted the new administrator every registered permission. v2.0.0 added
+        # inventory.manage and inventory.logs, so the catalogue grew from 14 to 16; asserting
+        # against the permissions table keeps this check valid for future releases while the
+        # lower bound still catches a migration that silently failed to seed the catalogue.
         self.env['TEST_PRIVATE']=str(self.private)
         self.env['TEST_PUBLIC']=str(self.public)
         self.env['TEST_ADMIN_PASSWORD']=self.admin_password
@@ -123,7 +127,8 @@ $db=getenv('TEST_DB_NAME');$pdo->exec("DROP DATABASE IF EXISTS `$db`");$pdo->exe
 $_SERVER['APP_PUBLIC_PATH']=getenv('TEST_PUBLIC');$app=require getenv('TEST_PRIVATE').'/bootstrap/app.php';
 $app->make(Illuminate\\Contracts\\Console\\Kernel::class)->bootstrap();
 $u=App\\Models\\User::where('email','owner@example.test')->firstOrFail();
-if(!Illuminate\\Support\\Facades\\Hash::check(getenv('TEST_ADMIN_PASSWORD'),$u->password)||$u->getAllPermissions()->count()!==14) exit(3);''')
+$total=Illuminate\\Support\\Facades\\DB::table('permissions')->count();
+if(!Illuminate\\Support\\Facades\\Hash::check(getenv('TEST_ADMIN_PASSWORD'),$u->password)||$total<16||$u->getAllPermissions()->count()!==$total) exit(3);''')
 
     def assert_diagnostic(self, status, body, stage):
         self.assertEqual(status, 500, body)
