@@ -15,23 +15,36 @@
 | :-- | :-- | :-- |
 | فرانت‌اند (React/TS) | `npx tsc -b` (بررسی انواع، حالت سخت‌گیرانه) و `npm run build` (Vite) | ✅ هر دو بدون خطا |
 | بسته‌بندی cPanel | `python3 -m unittest discover -s tests -v` در `deploy/cpanel` | ✅ ۱۷ آزمون: ۱۰ موفق، ۷ skip |
-| بک‌اند (Laravel) | بازبینی ایستای کد (خواندن مسیر کامل درخواست → کنترلر → سرویس → مدل → مایگریشن) | ⚠️ اجرا نشد |
-| پایگاه داده | بازبینی مایگریشن‌ها + اسکریپت SQL خام + تطبیق با `INFORMATION_SCHEMA` | ⚠️ اجرا نشد |
+| **بک‌اند (Laravel) — نحو** | `php -l` روی همه فایل‌های `backend/` و `deploy/cpanel/` در GitHub Actions | ✅ موفق در CI |
+| **بک‌اند — مایگریشن و سرویس انبار** | smoke test واقعی بسته استخراج‌شده روی **SQLite** و روی **MySQL 8** (نصب تازه + ارتقای Idempotent با اجرای دوباره مایگریشن‌ها) | ✅ موفق در CI |
+| **نصب‌کننده cPanel** | آزمون HTTP واقعی `install.php` (فرم واقعی، تشخیص خطا، تلاش مجدد، رمز با کاراکتر خاص، CSRF، قفل نصب) | ✅ موفق در CI |
+| ساخت بسته | `deploy/cpanel/build.sh` (Composer production + `npm ci` + Vite + دو ZIP + `verify-package.sh`) | ✅ موفق در CI |
 | رابط کاربری در مرورگر | تحلیل کد و کلاس‌های CSS؛ آزمون دستی انجام نشد | ⚠️ نیازمند آزمون دستی |
 
-> 🔴 **محدودیت اصلی:** در محیط توسعه این نسخه هیچ `php` یا `composer` نصب نبود
-> (و PostgreSQL/MySQL در دسترس نبود). بنابراین **`php -l`، `artisan migrate`،
-> PHPUnit/Pest و آزمون واقعی endpointها اجرا نشده‌اند.** همه ادعاهای سمت بک‌اند در این
-> گزارش بر پایه «بازبینی ایستای کد» است و در ستون «وضعیت» با نشان
-> ⚠️ (نیازمند تأیید در زمان اجرا) از ✅ (راستی‌آزمایی‌شده با اجرای ابزار) تفکیک شده است.
+> 🟢 **اجرای واقعی CI:** workflow «cPanel package» روی همین شاخه با موفقیت کامل اجرا شد —
+> [run 42589005877](https://github.com/diswebir/industrial-crm-project/actions/runs/42589005877)
+> (job `129065715153`، مدت ۱m۵۲s، artifact `cpanel-package` تولید شد).
+> گام‌های موفق: `PHP syntax` · `Offline packaging regression tests` · `build.sh` ·
+> `SQLite extracted-package smoke test` · `MySQL fresh install and idempotent upgrade smoke test` ·
+> `Real installer GET/POST, failure diagnostics and retry tests`.
 >
-> برای پوشش همین شکاف، دو سازوکار در بسته قرار داده شده است:
-> 1. `deploy/cpanel/update.php` پس از اجرا، **گزارش راستی‌آزمایی ساختار پایگاه داده**
->    (ستون‌ها، جدول‌ها، دو مجوز جدید و شمارش رکوردها) را نمایش می‌دهد.
-> 2. `deploy/cpanel/database/v2.0.0-mysql.sql` در پایان، **جدول گزارش ۱۷ ردیفی** تولید می‌کند.
+> این اجرا، بخش عمده‌ای از ادعاهای سمت بک‌اند را از «بازبینی ایستا» به «اجرای واقعی» ارتقا داد:
+> نحو همه فایل‌های PHP، اجرای مایگریشن‌ها روی MySQL واقعی، **اجرای دوباره مایگریشن‌ها بدون خطا**
+> (Idempotent بودن)، وجود ستون‌ها و جدول‌های جدید پس از ارتقای درجا، شمار ۱۶ مجوز برای مدیر،
+> بارگذاری مسیرهای جدید (`route:list`) و منطق انبار
+> (ورود ۵ ← تخصیص ۲ ⇒ موجودی ۳ ← کاهش تعداد ⇒ بازگشت ← حذف تخصیص ⇒ بازگشت کامل ←
+> تخصیص بیش از موجودی ⇒ **بدون تغییر موجودی** ← حذف مشتری ⇒ سازگاری موجودی).
 >
-> پیشنهاد می‌شود سناریوهای بخش ۵ (آزمون دستی) پیش از تحویل نهایی روی یک کپی از
-> پایگاه داده پروداکشن اجرا و صورت‌جلسه شود.
+> 🔴 **محدودیت باقی‌مانده:** در محیط توسعه این نسخه هیچ `php` یا `composer` نصب نبود،
+> بنابراین این اجراها در CI انجام شدند و نه محلی. آنچه همچنان **آزمون نشده** باقی می‌ماند:
+> پاسخ‌های HTTP endpointهای API (۴۰۳ دامنه دسترسی، ۴۲۲ موجودی، صفحه‌بندی `/inventory/logs`)،
+> خروجی واقعی فایل `.xlsx` در Excel، رندر مرورگری تقویم و فونت، و پنل Filament.
+> برای همین، سناریوهای بخش ۵ باید پیش از تحویل نهایی روی محیط آزمایشی اجرا و صورت‌جلسه شوند.
+>
+> ⚙️ **نکته اولین اجرای CI:** نخستین اجرا فقط به‌دلیل ادعای «دقیقاً ۱۴ مجوز» در
+> `deploy/cpanel/tests/test_installer_http.py` شکست (نسخه ۲٫۰٫۰ شانزده مجوز دارد) و در
+> commit `263a9cf` به «مدیر نصب‌شده باید همه مجوزهای ثبت‌شده را داشته باشد و شمار آن‌ها
+> از ۱۶ کمتر نباشد» تغییر کرد. هیچ شکستی در کد برنامه گزارش نشد.
 
 ---
 
@@ -39,12 +52,12 @@
 
 | گام | تسک | موضوع | وضعیت |
 | :- | :- | :-- | :- |
-| ۱ | — | زیرساخت دیتابیس (مایگریشن‌های `000014`…`000019`) | ✅ کد / ⚠️ اجرا |
-| ۲ | تسک ۱ | RBAC و دسترسی دانه‌ای مشتریان | ✅ کد / ⚠️ اجرا |
-| ۳ | تسک ۴ | سرویس انبار، کسر/بازگشت موجودی و لاگ | ✅ کد / ⚠️ اجرا |
-| ۴ | تسک ۳ | مدیریت کامل دستگاه‌های تخصیص‌یافته | ✅ کد / ⚠️ اجرا |
-| ۵ | تسک ۵ | اعتبارسنجی مشتری حقیقی/حقوقی | ✅ کد / ⚠️ اجرا |
-| ۶ | تسک ۶ | خروجی اکسل کامل (دو شیت) | ✅ کد / ⚠️ اجرا |
+| ۱ | — | زیرساخت دیتابیس (مایگریشن‌های `000014` تا `000019`) | ✅ **اجرای واقعی در CI روی MySQL 8 و SQLite** |
+| ۲ | تسک ۱ | RBAC و دسترسی دانه‌ای مشتریان | ✅ کد / ⚠️ آزمون دستی HTTP |
+| ۳ | تسک ۴ | سرویس انبار، کسر/بازگشت موجودی و لاگ | ✅ **اجرا در CI (smoke test)** |
+| ۴ | تسک ۳ | مدیریت کامل دستگاه‌های تخصیص‌یافته | ✅ کد + منطق انبار در CI / ⚠️ آزمون دستی UI |
+| ۵ | تسک ۵ | اعتبارسنجی مشتری حقیقی/حقوقی | ✅ کد / ⚠️ آزمون دستی HTTP |
+| ۶ | تسک ۶ | خروجی اکسل کامل (دو شیت) | ✅ کد / ⚠️ بازکردن فایل در Excel |
 | ۷ | تسک ۲ | تغییر سراسری «قطعه» → «دستگاه» | ✅ **راستی‌آزمایی‌شده با grep** |
 | ۸ | تسک ۷ | رفع باگ تقویم شمسی (Portal) | ✅ کد / ⚠️ مرورگر |
 | ۹ | تسک ۸ | پاکسازی فرم لاگین | ✅ **راستی‌آزمایی‌شده با grep** |
@@ -53,6 +66,14 @@
 ---
 
 ## ۳) بررسی تفصیلی معیارهای پذیرش (AC)
+
+**راهنمای نشان‌های ستون «وضعیت»:**
+
+| نشان | معنی |
+| :-- | :-- |
+| ✅ | با اجرای ابزار راستی‌آزمایی شده است (CI، `grep`، `tsc`/build یا آزمون بسته‌بندی) |
+| ✅ کد | پیاده‌سازی با بازبینی ایستا تأیید شد، اما اجرای آن در CI پوشش داده نشده (نیازمند آزمون دستی) |
+| ⚠️ مرورگر | فقط با آزمون دستی در مرورگر قابل تأیید است |
 
 ### گام ۱ — زیرساخت دیتابیس
 
@@ -66,8 +87,8 @@
 | تبدیل امن `NOT NULL → NULL` | `000014`: `first_name`, `last_name`, `mobile` با `->nullable()->change()` | ✅ |
 | مقادیر پیش‌فرض امن | `customers_scope='all'`، `quantity=1` (+`UPDATE` اصلاحی برای ردیف‌های `<1`)، `stock_quantity=0`، `created_by_user_id=NULL` | ✅ |
 | سازگاری دو درایور (MySQL/PostgreSQL) | استفاده نکردن از `ADD COLUMN IF NOT EXISTS`؛ معادل‌سازی با `hasColumn` | ✅ |
-| هم‌ارزی با اسکریپت SQL خام | `INFORMATION_SCHEMA` + `PREPARE/EXECUTE`؛ ۲۰ بلوک شرطی؛ ثبت شش مایگریشن در جدول `migrations` با `batch` جدید | ✅ |
-| اجرای واقعی روی داده | — | ⚠️ |
+| هم‌ارزی با اسکریپت SQL خام | `INFORMATION_SCHEMA` + `PREPARE/EXECUTE`؛ ۲۰ بلوک شرطی؛ ثبت شش مایگریشن در جدول `migrations` با `batch` جدید | ✅ کد (اجرای phpMyAdmin دستی) |
+| اجرای واقعی روی داده | CI: گام «MySQL fresh install and idempotent upgrade smoke test» — نصب تازه روی MySQL 8 و سپس اجرای **دوباره** مایگریشن‌ها (`Migration run 1/2 succeeds`) + بررسی وجود تک‌تک ستون‌ها و جدول‌های جدید | ✅ |
 
 **نکته اجرایی:** چون محیط اجرا در دسترس نبود، در اسکریپت SQL خام طول و
 مجموعه‌کاراکتر فعلی هر ستون از `INFORMATION_SCHEMA` خوانده می‌شود و فقط `NULL`-پذیری
@@ -87,7 +108,7 @@
   (`CustomerController` فهرست و خروجی، `PartController` تخصیص و سوابق، `SmsController`,
   `DashboardController`, `InventoryController`, `CustomersSheet`, `CustomerDevicesSheet`,
   `CustomerResource`, `InventoryLogResource`).
-- وضعیت: ✅ کد / ⚠️ اجرا
+- وضعیت: ✅ کد / ⚠️ آزمون دستی
 
 **AC-۲:** `GET /customers/{id}` روی مشتری دیگران ⇒ `403` (نه فقط پنهان‌سازی در UI).
 
@@ -97,7 +118,7 @@
 - فراخوانی‌شده در: `CustomerController.php:111` (show)، `:130` (update)، `:163` (destroy)؛
   `PartController.php:208` (تخصیص)، `:260/:295/:315` (نمایش/ویرایش/حذف تخصیص)،
   `:346/:374` (ویرایش/حذف سابقه سرویس).
-- وضعیت: ✅ کد / ⚠️ اجرا
+- وضعیت: ✅ کد / ⚠️ آزمون دستی
 
 **AC-۳:** اعطا/لغو هر سه حالت استثنا از فرم ویرایش کاربر با اثر فوری.
 
@@ -109,7 +130,7 @@
 - فرانت‌اند: `components/settings/RoleAccessFields.tsx` (نقش + دامنه + دو SearchableSelect
   با اعمال پیش‌فرض نقش)، استفاده در `CreateUserPage`, `EditUserPage`, `UsersAclPage`
   (مودال «دسترسی مشتریان» با `usersApi.updateAccessScope`).
-- وضعیت: ✅ کد / ⚠️ اجرا
+- وضعیت: ✅ کد / ⚠️ آزمون دستی
 
 **AC-۴:** همان محدودیت روی `update`, `destroy`, `export`, تخصیص، سابقه سرویس و آمار داشبورد.
 
@@ -125,7 +146,7 @@
 | آمار داشبورد | `DashboardController::stats` → `my_customers`, `has_global_customer_access` |
 | پنل Filament | `CustomerResource` و `InventoryLogResource` با `visibleTo` |
 
-- وضعیت: ✅ کد / ⚠️ اجرا
+- وضعیت: ✅ کد / ⚠️ آزمون دستی
 
 **AC تکمیلی — کاتالوگ مجوزها:** ۱۶ مجوز با برچسب فارسی و گروه‌بندی
 (`UserController::PERMISSION_LABELS` و `PERMISSION_GROUPS`): ۶ × `customers.*`،
@@ -144,7 +165,9 @@
   ثبت `stock_before`, `stock_after` (`:214`), `user_id`, `customer_id`, `customer_part_id`,
   `reference`, `notes`, `logged_at`.
 - مسیر فراخوانی: `CustomerService::assignPart()` (داخل Transaction) ← `PartController::assignPart()`.
-- وضعیت: ✅ کد / ⚠️ اجرا
+- **در CI اجرا شد:** smoke test روی SQLite و MySQL ⇒ `Stock receipt increases device stock to 5`،
+  `Assigning 2 devices reduces stock from 5 to 3` (همان سناریوی AC با ۲ دستگاه).
+- وضعیت: ✅ (اجرای واقعی در CI)
 
 **AC-۲:** موجودی ناکافی ⇒ `422` فارسی و **بدون هیچ تغییر** در دیتابیس.
 
@@ -154,20 +177,26 @@
   (بدون لاگ، بدون تغییر تعداد، بدون تغییر وضعیت مشتری).
 - در فرم تخصیص، کنترل پیش‌دستی سمت کلاینت هم وجود دارد
   (`AssignPartModal.tsx:104-111`: `availableStock`, `effectiveStock`, `notEnoughStock`).
-- وضعیت: ✅ کد / ⚠️ اجرا
+- **در CI اجرا شد:** `Rejected assignment leaves the stock untouched` (پس از تخصیص
+  بیش از موجودی، موجودی دست‌نخورده ماند) — یعنی Rollback کامل. پاسخ `422` از مسیر HTTP
+  و متن دقیق پیام فارسی نیازمند آزمون دستی است.
+- وضعیت: ✅ (منطق در CI) / ✅ کد (پاسخ HTTP)
 
 **AC-۳ و ۴:** حذف تخصیص ⇒ `return`؛ ویرایش تعداد ۳←۱ ⇒ بازگشت ۲ (`return`)؛ ۱←۴ ⇒ کسر ۳ (`out`).
 
 - `CustomerService::updateAssignment()` اختلاف تعداد را محاسبه و یک حرکت ثبت می‌کند؛
   `destroyAssignment()` کل `quantity` را با `type=return` برمی‌گرداند.
-- وضعیت: ✅ کد / ⚠️ اجرا
+- **در CI اجرا شد:** `Reducing assignment quantity returns one device to stock`،
+  `Deleting the assignment returns all devices to stock` و `Customer deletion keeps stock consistent`.
+- وضعیت: ✅ (اجرای واقعی در CI)
 
 **AC-۵:** موجودی هیچ‌گاه منفی نشود (Check در سرویس + گارد به‌روزرسانی).
 
 - بررسی پیش از نوشتن + به‌روزرسانی شرطی
   (`WHERE stock_quantity = <مقدار خوانده‌شده>`)؛ در صورت صفر بودن ردیف تغییریافته:
   «موجودی انبار همزمان توسط کاربر دیگری تغییر شد. لطفاً عملیات را تکرار کنید.» (`:194`).
-- وضعیت: ✅ کد / ⚠️ اجرا
+- وضعیت: ✅ کد — سناریوی برخورد همزمانِ واقعی (دو درخواست موازی) در CI پوشش ندارد و
+  باید با آزمون دستی دو تب همزمانآزمون شود (سناریوی ۵٫۳ ردیف ۷).
 
 **AC-۶:** `GET /inventory/logs` با فیلترها و صفحه‌بندی + نام کاربر و مشتری.
 
@@ -179,7 +208,7 @@
 - UI: `pages/Inventory.tsx` با کارت‌های خلاصه (`/inventory/summary`)، جدول گردش،
   فیلترها و `StockMovementModal`؛ مسیر `/inventory` پشت
   `PermissionRoute permission="inventory.logs"` در `App.tsx`.
-- وضعیت: ✅ کد / ⚠️ اجرا
+- وضعیت: ✅ کد / ⚠️ آزمون دستی
 
 **AC تکمیلی — گزارش مغایرت:** `GET /inventory/reconciliation` موجودی ثبت‌شده را با
 جمع تخصیص‌ها مقایسه و موارد مغایر را برمی‌گرداند.
@@ -418,6 +447,34 @@ $ grep -rn "قطع" -I . | grep -v "^./.git/" | grep -v node_modules | grep -v "
 
 # ۴) راستی‌آزمایی لاگین (تسک ۸)
 $ grep -c "Admin@123456" frontend/src/pages/Login.tsx   # 0
+
+# ۵) اجرای واقعی CI روی همین شاخه (GitHub Actions → cPanel package)
+run 42589005877 / job 129065715153 → PASS (1m52s)
+  ✓ Set up job                ✓ Initialize containers      ✓ checkout / setup-php 8.4 / setup-node 22
+  ✓ PHP syntax (php -l)       ✓ Offline packaging regression tests
+  ✓ bash deploy/cpanel/build.sh
+  ✓ SQLite extracted-package smoke test
+  ✓ MySQL fresh install and idempotent upgrade smoke test
+  ✓ Real installer GET/POST, failure diagnostics and retry tests
+  ✓ upload-artifact: cpanel-package
+```
+
+محتوای smoke test (که در CI روی هر دو پایگاه داده اجرا و موفق شد) شامل این راستی‌آزمایی‌هاست:
+
+```text
+PASS: Migration run 1 succeeds                       PASS: Migration run 2 succeeds   ← Idempotent
+PASS: Administrator has all 16 direct permissions (14 legacy + 2 inventory)
+PASS: Packaged application routes load               PASS: Public disk accepts an upload
+PASS: Stock receipt increases device stock to 5
+PASS: Assigning 2 devices reduces stock from 5 to 3
+PASS: Reducing assignment quantity returns one device to stock
+PASS: Deleting the assignment returns all devices to stock
+PASS: Rejected assignment leaves the stock untouched
+PASS: Customer deletion keeps stock consistent
++ بررسی وجود ستون‌ها/جدول‌های جدید پس از ارتقای درجا (customers.created_by_user_id،
+  users.customers_scope، parts.stock_quantity/min_stock_quantity/unit_label،
+  customer_parts.quantity/invoice_number/invoice_amount/assigned_by_user_id،
+  inventory_logs، user_staff_access، user_customer_access)
 ```
 
 ---
@@ -425,11 +482,15 @@ $ grep -c "Admin@123456" frontend/src/pages/Login.tsx   # 0
 ## ۸) جمع‌بندی و امضا
 
 - هر ۹ تسک خواسته‌شده و هر ۱۴ باگ شناسایی‌شده در فاز تحلیل، در کد پیاده‌سازی شده‌اند.
-- **دو گام با ابزار راستی‌آزمایی قطعی شده‌اند:** تغییر واژگان (grep) و پاکسازی فرم لاگین (grep).
-- **سه گام با اجرای ابزار راستی‌آزمایی شده‌اند:** تایپ‌فرانت‌اند، build و آزمون بسته‌بندی.
-- **باقی موارد با بازبینی ایستای کد تأیید شده‌اند** و برای قطعیت نهایی به اجرای
-  سناریوهای بخش ۵ روی محیط آزمایشی نیاز دارند؛ این محدودیت ناشی از نبود
-  PHP/Composer/پایگاه داده در محیط توسعه این نسخه است و در بخش ۱ به‌صراحت اعلام شده.
+- **workflow «cPanel package» روی همین شاخه سبز است** و در نتیجه: نحو همه فایل‌های PHP،
+  ساخت بسته، اجرای مایگریشن‌ها روی MySQL 8 و SQLite (دوبار = Idempotent)، ساختار جدید
+  پایگاه داده، شمار ۱۶ مجوز، منطق کسر/بازگشت موجودی و نصب‌کننده واقعی cPanel
+  به‌صورت **اجرای واقعی** تأیید شده‌اند.
+- **دو گام با grep راستی‌آزمایی قطعی شده‌اند:** تغییر واژگان و پاکسازی فرم لاگین.
+- **سه گام محلی با اجرای ابزار راستی‌آزمایی شده‌اند:** تایپ فرانت‌اند، build و آزمون بسته‌بندی.
+- آنچه باقی می‌ماند **لایه مرورگر و پاسخ‌های HTTP API** است (رندر تقویم و فونت، بازکردن
+  فایل اکسل در Excel، پاسخ‌های ۴۰۳/۴۲۲ از طریق رابط) که باید با سناریوهای بخش ۵ روی
+  محیط آزمایشی صورت‌جلسه شود.
 - هیچ تغییر مخربی در پایگاه داده طراحی نشده است: ارتقا افزودنی، Idempotent و با
   دو مسیر اجرایی (Artisan و SQL خام) به‌همراه گزارش راستی‌آزمایی در پایان هر دو مسیر.
 

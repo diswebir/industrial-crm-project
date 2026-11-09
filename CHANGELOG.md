@@ -232,14 +232,23 @@
 
 ### 🧪 وضعیت آزمون
 
-- فرانت‌اند: `npx tsc -b` بدون خطا و `npm run build` موفق.
-- بسته‌بندی cPanel: `python3 -m unittest discover -s tests` در `deploy/cpanel`
+- **GitHub Actions (workflow «cPanel package»): سبز ✅** —
+  [run 42589005877](https://github.com/diswebir/industrial-crm-project/actions/runs/42589005877)
+  شامل `php -l` روی همه فایل‌های بک‌اند، ساخت بسته (`build.sh` + `verify-package.sh`)،
+  smoke test واقعی روی **SQLite** و **MySQL 8** (نصب تازه + ارتقای Idempotent با اجرای
+  دوباره مایگریشن‌ها) و آزمون‌های HTTP واقعی نصب‌کننده cPanel.
+- smoke testها این موارد را با اجرای واقعی تأیید کردند: ۱۶ مجوز برای مدیر، وجود همه
+  ستون‌ها/جدول‌های جدید پس از ارتقای درجا، بارگذاری مسیرهای جدید، و منطق انبار
+  (ورود ۵ ← تخصیص ۲ ⇒ ۳ ← کاهش تعداد ⇒ بازگشت ← حذف تخصیص ⇒ بازگشت کامل ←
+  تخصیص بیش از موجودی ⇒ بدون تغییر موجودی ← حذف مشتری ⇒ سازگاری موجودی).
+- فرانت‌اند: `npx tsc -b` بدون خطا و `npm run build` موفق (۶۲ فایل در `dist/assets`
+  شامل ۹ فایل فونت `woff2`).
+- بسته‌بندی cPanel (محلی): `python3 -m unittest discover -s tests` در `deploy/cpanel`
   ⇒ ۱۷ آزمون، ۱۰ موفق و ۷ skip (آزمون‌های HTTP نصب‌کننده که به MySQL واقعی و
-  opt-in صریح نیاز دارند).
-- بک‌اند: در محیط توسعه این نسخه امکان اجرای PHP/Composer/PHPUnit وجود نداشت؛
-  تغییرات با بازبینی ایستا و از طریق `deploy/cpanel/update.php` و اسکریپت SQL
-  مستقل راستی‌آزمایی می‌شوند. جزئیات در
-  [`docs/ACCEPTANCE-REPORT-v2.0.0.fa.md`](docs/ACCEPTANCE-REPORT-v2.0.0.fa.md).
+  opt-in صریح نیاز دارند و در CI اجرا می‌شوند).
+- آنچه آزمون نشده باقی می‌ماند: رندر مرورگری (تقویم، فونت)، بازکردن خروجی `.xlsx` در
+  Excel و پاسخ‌های HTTP endpointهای API از طریق رابط کاربری. جزئیات و سناریوهای آزمون
+  دستی در [`docs/ACCEPTANCE-REPORT-v2.0.0.fa.md`](docs/ACCEPTANCE-REPORT-v2.0.0.fa.md).
 
 ---
 
