@@ -56,8 +56,17 @@
 
 ## ۳) دریافت بسته `v2.0.0`
 
-**روش الف — بدون SSH (توصیه‌شده):** در GitHub، Actions → workflow **cPanel package** →
-Run workflow (روی تگ `v2.0.0`) → دانلود artifact `cpanel-package`.
+**روش الف — بدون SSH (توصیه‌شده):** GitHub Actions بسته را خودکار می‌سازد و در Release
+منتشر می‌کند. دو ZIP را از صفحه Release تگ `v2.0.0` بگیرید، یا مستقیم:
+
+```bash
+bash deploy/cpanel/download-release.sh v2.0.0
+```
+
+اگر تگ نسخه منتشر نشده است، از Release چرخشی `latest-build` (آخرین بیلد شاخه `main`) استفاده کنید:
+`bash deploy/cpanel/download-release.sh`. در هر دو حالت فایل‌ها داخل پوشه `cpanel-release/`
+قرار می‌گیرند و اثر انگشت SHA256 به‌صورت خودکار راستی‌آزمایی می‌شود. توضیح کامل:
+[RELEASE-AUTOMATION.fa.md](RELEASE-AUTOMATION.fa.md).
 
 **روش ب — ساخت محلی:** روی رایانه‌ای با PHP 8.4.1+، Composer، Node 22.12+ و zip:
 

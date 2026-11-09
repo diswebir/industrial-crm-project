@@ -10,9 +10,26 @@
 
 ## ۱. دریافت بسته
 
-در GitHub بخش Actions، workflow به نام **cPanel package** را با Run workflow اجرا کنید. پس از موفقیت artifact به نام `cpanel-package` را دانلود کنید. این workflow با تگ `v*` نیز اجرا می‌شود؛ فایل‌ها artifact هستند، نه پیوست خودکار Release.
+بسته‌ها **خودکار** توسط GitHub Actions ساخته و در Release منتشر می‌شوند: هر push به `main`
+تگ چرخشی `latest-build` را تازه می‌کند و هر تگ `v*` یک Release نسخه‌دار با نشان **Latest**
+می‌سازد. دریافت در پوشه `cpanel-release/`:
 
-یا روی ماشین دارای PHP و افزونه‌های موردنیاز، Composer، Node 22.12+، npm و zip:
+```bash
+bash deploy/cpanel/download-release.sh              # جدیدترین بیلد main
+bash deploy/cpanel/download-release.sh v2.0.1       # یک نسخه مشخص
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\cpanel\download-release.ps1
+```
+
+آدرس ثابت مرورگر (بدون ورود به Actions):
+`https://github.com/diswebir/industrial-crm-project/releases/download/latest-build/cpanel-public.zip`
+و همان مسیر برای `cpanel-private.zip`. توضیح کامل اتوماسیون، راستی‌آزمایی و عیب‌یابی:
+[RELEASE-AUTOMATION.fa.md](RELEASE-AUTOMATION.fa.md). PRها فقط artifact می‌سازند
+(`cpanel-package` در تب Actions) و هرگز Release منتشر نمی‌کنند.
+
+اگر می‌خواهید بسته را خودتان بسازید، روی ماشین دارای PHP و افزونه‌های موردنیاز، Composer، Node 22.12+، npm و zip:
 
 ```bash
 bash deploy/cpanel/build.sh

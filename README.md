@@ -10,7 +10,7 @@
 
 بسته استقرار شامل دو فایل مستقل `cpanel-public.zip` و `cpanel-private.zip` است. مسیر خصوصی در `private-path.php` قابل تنظیم است؛ برای مثال فایل‌های عمومی در `/home/USER/xx.example.com` و هسته خصوصی در `/home/USER/private_pro/project1/myc` قرار می‌گیرند.
 
-- ساخت بدون SSH روی هاست: از GitHub Actions → **cPanel package** → Run workflow و دانلود artifact استفاده کنید.
+- دریافت **خودکار** بسته (بدون SSH و بدون ساخت محلی): GitHub Actions با هر push به `main` و هر تگ `v*` دو ZIP را می‌سازد، می‌آزماید و در Release منتشر می‌کند. دانلود در پوشه `cpanel-release/` با `bash deploy/cpanel/download-release.sh` — توضیح کامل: [`deploy/cpanel/RELEASE-AUTOMATION.fa.md`](deploy/cpanel/RELEASE-AUTOMATION.fa.md)
 - ساخت محلی: `bash deploy/cpanel/build.sh` (نیازمند PHP/Composer و Node 22.12+ روی ماشین ساخت).
 - نصب: ویزارد فارسی `install.php`، انتخاب اطلاعات مدیر اختصاصی و ایجاد قفل دائمی نصب.
 - آموزش کامل ساخت محلی روی ویندوز و آپلود مستقیم به هاست: [`WINDOWS-BUILD-GUIDE.fa.md`](deploy/cpanel/WINDOWS-BUILD-GUIDE.fa.md) — lock فعلی به PHP 8.4.1+ نیاز دارد.

@@ -66,3 +66,32 @@
 ## تکمیل آزمون ویزارد
 
 در اجرای https://github.com/diswebir/industrial-crm-project/actions/runs/41902437021 تست GET/POST واقعی نصب و سناریوهای bootstrap failure، migration failure/retry و fatal autoload موفق شدند. این تست از PHP built-in server استفاده می‌کند، نه Apache/cPanel واقعی. جزئیات در BUILD-TEST-REPORT.md است.
+
+## انتشار خودکار Release (افزوده شد)
+
+workflow `cpanel.yml` حالا دو job دارد: `package` (ساخت و همه آزمون‌ها، `contents: read`) و
+`release` (انتشار، `contents: write`). با هر push به `main` تگ چرخشی `latest-build` به کامیت
+جدید منتقل و فایل‌ها با `--clobber` جایگزین می‌شوند؛ با هر تگ `v*` یک Release نسخه‌دار با
+`--verify-tag` ساخته می‌شود. PRها فقط artifact می‌سازند.
+
+راستی‌آزمایی‌های انجام‌شده:
+
+| مورد | روش | نتیجه |
+| :-- | :-- | :-- |
+| ساختار YAML و شکل تریگرها/jobها/دسترسی‌ها | `tests/test_release_workflow.py` (۱۵ آزمون) | موفق |
+| سینتکس همه بلوک‌های `run:` | `bash -n` روی هر بلوک با جایگزینی عبارت‌های `${{ }}` | موفق، صفر خطا |
+| تولید متن Release (هر دو شاخه: تگ نسخه و `latest-build`) | اجرای واقعی گام‌های `Resolve release target` و `Write release notes` با ورودی ساختگی | موفق، شامل حالت نبود راهنمای ارتقا |
+| ثبت نسخه/ref در `build-info.txt` | دو آزمون جدید در `tests/test_build.py` (مقدار CI و fallback به فایل `VERSION` و `unknown`) | موفق |
+| اسکریپت دانلود | اجرای واقعی روی سرور HTTP محلی (فایل‌های ساختگی) + مسیر خطای ۴۰۴ | موفق؛ اثر انگشت تأیید شد، کد خروج ۱ در حالت خطا، بدون فایل نیمه‌کاره |
+
+مواردی که هنوز با اجرای واقعی آزموده نشده‌اند:
+
+- `gh release create/edit/upload` و `git push -f origin refs/tags/latest-build` روی رانر واقعی؛
+  این مسیر برای نخستین بار با اولین push به `main` اجرا می‌شود. اگر `Workflow permissions`
+  مخزن روی «Read only» قفل باشد، گام «Move the rolling tag» با خطای ۴۰۳ شکست می‌خورد
+  (در جدول عیب‌یابی `RELEASE-AUTOMATION.fa.md` آمده است).
+- دانلود واقعی از `github.com/releases/download/...` از sandbox ممکن نبود (محدودیت شبکه)،
+  بنابراین مسیر موفق اسکریپت دانلود با سرور HTTP محلی و همان نام فایل‌ها آزموده شد.
+- `download-release.ps1` روی PowerShell واقعی ویندوز اجرا نشده است؛ فقط بازبینی ایستا.
+- چهار آزمون ساختاری `test_release_workflow.py` به PyYAML نیاز دارند و در صورت نبود آن skip
+  می‌شوند؛ بقیه آزمون‌ها بدون وابستگی اجرا می‌شوند.

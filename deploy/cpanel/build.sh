@@ -166,7 +166,15 @@ unzip -tq "$RELEASE/cpanel-public.zip"
 unzip -tq "$RELEASE/cpanel-private.zip"
 # Validate the actual archives, not merely the staging directories.
 bash "$ROOT/deploy/cpanel/verify-package.sh" "$RELEASE"
+# Every published archive must be traceable back to one application version and one Git ref.
+# CI passes CPANEL_BUILD_* explicitly; a local build falls back to the VERSION file.
+APP_VERSION="${CPANEL_BUILD_VERSION:-}"
+if [[ -z "$APP_VERSION" ]]; then
+  APP_VERSION="$( [[ -s "$ROOT/VERSION" ]] && tr -d ' \t\r\n' < "$ROOT/VERSION" || printf 'unknown' )"
+fi
 {
+  printf 'App version: %s\n' "$APP_VERSION"
+  printf 'Source: %s @ %s\n' "${CPANEL_BUILD_BRANCH:-unknown}" "${CPANEL_BUILD_COMMIT:-unknown}"
   printf 'Built at (UTC): %s\n' "$(date -u +%FT%TZ)"
   printf 'PHP: %s\nNode: %s\n' "$(php -r 'echo PHP_VERSION;')" "$(node -v)"
   printf 'Requires hosting PHP >= 8.4.1 with required extensions.\n'

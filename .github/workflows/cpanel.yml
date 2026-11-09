@@ -1,12 +1,27 @@
 name: cPanel package
+
+# بسته‌های استقرار cPanel به‌صورت خودکار ساخته و منتشر می‌شوند:
+#   push به main  → ساخت + آزمون + به‌روزرسانی Release چرخشی «latest-build»
+#   تگ v*         → ساخت + آزمون + Release نسخه‌دار (با نشان Latest گیت‌هاب)
+#   pull_request  → ساخت + آزمون فقط (artifact برای بازبینی، بدون انتشار)
+# راهنما: deploy/cpanel/RELEASE-AUTOMATION.fa.md
 on:
-  pull_request:
-    paths: ["backend/**", "frontend/**", "deploy/cpanel/**", ".github/workflows/cpanel.yml"]
-  workflow_dispatch:
   push:
+    branches: [main]
     tags: ['v*']
+  pull_request:
+    paths: ["backend/**", "frontend/**", "deploy/cpanel/**", ".github/workflows/cpanel.yml", "VERSION"]
+  workflow_dispatch:
+
 permissions:
   contents: read
+
+# دو push پشت‌سرهم به main نباید هم‌زمان روی یک تگ Release بنویسند.
+# برای PR، اجرای قدیمی‌تر لغو می‌شود تا دقیقه‌های CI هدر نرود.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   package:
     runs-on: ubuntu-24.04
@@ -32,11 +47,37 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+      - name: Resolve build identity
+        id: identity
+        # هر ZIP باید به یک نسخه و یک ref گیت قابل ردیابی باشد (در build-info.txt ثبت می‌شود).
+        run: |
+          set -Eeuo pipefail
+          version="$(tr -d ' \t\r\n' < VERSION)"
+          case "$GITHUB_EVENT_NAME" in
+            pull_request) ref="pr-${GITHUB_REF_NAME%%/*}" ;;
+            *)            ref="$GITHUB_REF_NAME" ;;
+          esac
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            build_version="$version"
+          else
+            build_version="$version-$ref+${GITHUB_SHA:0:7}"
+          fi
+          {
+            echo "version=$version"
+            echo "ref=$ref"
+            echo "build_version=$build_version"
+          } >> "$GITHUB_OUTPUT"
+          echo "app version=$version ref=$ref build_version=$build_version"
       - name: PHP syntax
         run: find backend deploy/cpanel -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Offline packaging regression tests
         run: python3 -m unittest discover -s deploy/cpanel/tests -v
-      - run: bash deploy/cpanel/build.sh
+      - name: Build public and private packages
+        env:
+          CPANEL_BUILD_VERSION: ${{ steps.identity.outputs.build_version }}
+          CPANEL_BUILD_BRANCH: ${{ steps.identity.outputs.ref }}
+          CPANEL_BUILD_COMMIT: ${{ github.sha }}
+        run: bash deploy/cpanel/build.sh
       - name: SQLite extracted-package smoke test
         run: bash deploy/cpanel/tests/smoke-package.sh cpanel-release
       - name: MySQL fresh install and idempotent upgrade smoke test
@@ -69,6 +110,21 @@ jobs:
             python3 -c 'from pathlib import Path; s=Path("installer-http-tests.log").read_text()[-20000:]; print("::error title=Installer HTTP test details::"+s.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))'
           fi
           exit "$status"
+      - name: Collect release extras
+        # راهنمای ارتقا با نام ثابت ضمیمه می‌شود تا مدیر سایت همیشه یک فایل واحد ببیند.
+        env:
+          REF_LABEL: ${{ steps.identity.outputs.ref }}
+        run: |
+          set -Eeuo pipefail
+          guide="$(ls -1 deploy/cpanel/UPGRADE-v*.fa.md 2>/dev/null | sort -V | tail -n 1 || true)"
+          if [ -n "$guide" ]; then
+            cp "$guide" cpanel-release/UPGRADE-GUIDE.fa.md
+            echo "Upgrade guide attached: $guide"
+          else
+            echo "No UPGRADE-v*.fa.md guide found; publishing without one."
+          fi
+          printf '%s\n' "$GITHUB_SHA" > cpanel-release/COMMIT.txt
+          printf '%s\n' "$REF_LABEL" > cpanel-release/REF.txt
       - uses: actions/upload-artifact@v4
         with:
           name: cpanel-package
@@ -76,4 +132,142 @@ jobs:
             cpanel-release/*.zip
             cpanel-release/SHA256SUMS
             cpanel-release/build-info.txt
+            cpanel-release/UPGRADE-GUIDE.fa.md
+            cpanel-release/COMMIT.txt
+            cpanel-release/REF.txt
           if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: package
+    # انتشار فقط از کد مرج‌شده یا تگ‌خورده؛ PRها هرگز Release نمی‌سازند.
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    permissions:
+      # فقط همین job اجازه نوشتن روی مخزن دارد (ساخت/به‌روزرسانی Release و تگ).
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: cpanel-package
+          path: cpanel-release
+      - name: Verify downloaded archives
+        # بسته پیش از انتشار دوباره بازبینی می‌شود تا artifact سالم به دست کاربر برسد.
+        run: |
+          set -Eeuo pipefail
+          cd cpanel-release
+          sha256sum -c SHA256SUMS
+          cd ..
+          bash deploy/cpanel/verify-package.sh cpanel-release
+          for kind in public private; do
+            printf 'archive OK: cpanel-%s.zip (%s)\n' "$kind" "$(du -h "cpanel-release/cpanel-$kind.zip" | cut -f1)"
+          done
+          echo '--- build-info.txt ---'
+          cat cpanel-release/build-info.txt
+
+      - name: Resolve release target
+        id: meta
+        run: |
+          set -Eeuo pipefail
+          version="$(tr -d ' \t\r\n' < VERSION)"
+          short="${GITHUB_SHA:0:7}"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            tag="${GITHUB_REF#refs/tags/}"
+            rolling=false
+            title="نسخه $tag — بسته استقرار cPanel ($version)"
+          else
+            tag=latest-build
+            rolling=true
+            title="آخرین بیلد main — نسخه $version ($short)"
+          fi
+          {
+            echo "tag=$tag"
+            echo "rolling=$rolling"
+            echo "title=$title"
+            echo "version=$version"
+          } >> "$GITHUB_OUTPUT"
+          echo "release target: tag=$tag rolling=$rolling title=$title"
+
+      - name: Write release notes
+        env:
+          APP_VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -Eeuo pipefail
+          built_at="$(grep -m1 'Built at' cpanel-release/build-info.txt 2>/dev/null | cut -d: -f2- | xargs || true)"
+          sums="$(cat cpanel-release/SHA256SUMS)"
+          {
+            printf '## بسته آماده استقرار cPanel\n\n'
+            printf 'این Release به‌صورت خودکار توسط GitHub Actions ساخته و راستی‌آزمایی شده است.\n\n'
+            printf '| مورد | مقدار |\n| :-- | :-- |\n'
+            printf '| نسخه سامانه | `%s` |\n' "$APP_VERSION"
+            printf '| کامیت | `%s` |\n' "$GITHUB_SHA"
+            printf '| شاخه/تگ | `%s` |\n' "$GITHUB_REF_NAME"
+            printf '| زمان بیلد | %s |\n' "${built_at:-نامشخص}"
+            printf '\n### فایل‌ها\n\n'
+            printf -- '- **`cpanel-public.zip`** — محتوای `public_html`: اسپای React، `install.php`، `update.php`، `.htaccess`، فونت‌ها و CSS پنل\n'
+            printf -- '- **`cpanel-private.zip`** — هسته لاراول، `vendor/`، مایگریشن‌ها و تنظیمات؛ **بیرون از دسترس وب** آپلود شود\n'
+            printf -- '- **`SHA256SUMS`** — اثر انگشت دو ZIP برای اطمینان از سلامت دانلود\n'
+            printf -- '- **`build-info.txt`** — نسخه، کامیت مبدأ، نسخه PHP/Node و hash فایل‌های lock\n'
+            if [[ -f cpanel-release/UPGRADE-GUIDE.fa.md ]]; then
+              printf -- '- **`UPGRADE-GUIDE.fa.md`** — راهنمای ارتقای بدون از دست رفتن داده روی هاست\n'
+            fi
+            printf '\n### اثر انگشت فایل‌ها\n\n```\n%s\n```\n\n' "$sums"
+            printf '### راستی‌آزمایی‌های انجام‌شده روی همین بسته\n\n'
+            printf '`php -l` روی همه فایل‌های PHP · آزمون رگرسیون بسته‌بندی · بیلد واقعی Composer و Vite ·\n'
+            printf 'بازبینی ساختار ZIP و رد فایل‌های حساس · نصب تازه و ارتقای تکرارپذیر روی MySQL 8 ·\n'
+            printf 'آزمون HTTP ویزارد نصب (GET/POST، تشخیص خطا و تلاش مجدد).\n\n'
+            printf '### نصب سریع\n\n'
+            printf '1. `cpanel-public.zip` را در پوشه وب (مثلاً `xx.example.com`) باز کنید.\n'
+            printf '2. `cpanel-private.zip` را **بیرون از `public_html`** باز کنید (مثلاً `private_pro/project1/myc`).\n'
+            printf '3. در `public_html/private-path.php` آدرس همان پوشه خصوصی را بنویسید.\n'
+            printf '4. مرورگر را به `https://دامنه/install.php` ببرید و ویزارد فارسی را کامل کنید.\n\n'
+            printf '> برای ارتقای نسخه موجود، به‌جای `install.php` از `update.php` استفاده کنید و پیش از آن از پایگاه داده پشتیبان بگیرید.\n'
+          } > release-notes.md
+          echo '--- release notes preview ---'
+          head -n 20 release-notes.md
+
+      - name: Move the rolling tag to this commit
+        if: steps.meta.outputs.rolling == 'true'
+        run: |
+          set -Eeuo pipefail
+          git tag -f latest-build "$GITHUB_SHA"
+          git push -f origin refs/tags/latest-build
+
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
+          RELEASE_TITLE: ${{ steps.meta.outputs.title }}
+          ROLLING: ${{ steps.meta.outputs.rolling }}
+        run: |
+          set -Eeuo pipefail
+          tag="$RELEASE_TAG"
+          title="$RELEASE_TITLE"
+          assets=(
+            cpanel-release/cpanel-public.zip
+            cpanel-release/cpanel-private.zip
+            cpanel-release/SHA256SUMS
+            cpanel-release/build-info.txt
+          )
+          if [[ -f cpanel-release/UPGRADE-GUIDE.fa.md ]]; then
+            assets+=(cpanel-release/UPGRADE-GUIDE.fa.md)
+          fi
+          extra=()
+          # Release چرخشی هرگز نشان «Latest» را از نسخه‌های رسمی نمی‌گیرد.
+          if [[ "$ROLLING" == 'true' ]]; then
+            extra+=(--latest=false)
+          fi
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Updating existing release: $tag"
+            gh release edit "$tag" --title "$title" --notes-file release-notes.md ${extra[@]+"${extra[@]}"}
+            gh release upload "$tag" --clobber "${assets[@]}"
+          else
+            echo "Creating release: $tag"
+            gh release create "$tag" --target "$GITHUB_SHA" --title "$title" \
+              --notes-file release-notes.md --verify-tag ${extra[@]+"${extra[@]}"} "${assets[@]}"
+          fi
+          gh release view "$tag" --json tagName,isLatest,url,assets \
+            --jq '"PUBLISHED tag=\(.tagName) latest=\(.isLatest) url=\(.url) assets=\([.assets[].name]|join(", "))"'

@@ -116,6 +116,29 @@ class BuildTest(unittest.TestCase):
         self.assertEqual(check.returncode, 0)
         self.assert_clean()
 
+    def test_build_info_records_ci_version_and_source(self):
+        # Every published ZIP must be traceable to one app version and one Git ref,
+        # because GitHub Releases keeps several builds side by side.
+        result=self.build(CPANEL_BUILD_VERSION='9.9.9-ci', CPANEL_BUILD_BRANCH='main',
+                          CPANEL_BUILD_COMMIT='abc1234567890def')
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        info=(self.out/'build-info.txt').read_text()
+        self.assertIn('App version: 9.9.9-ci', info)
+        self.assertIn('Source: main @ abc1234567890def', info)
+        self.assertIn('Built at (UTC):', info)
+        check=subprocess.run(['sha256sum', '-c', 'SHA256SUMS'], cwd=self.out, capture_output=True)
+        self.assertEqual(check.returncode, 0)
+
+    def test_build_info_falls_back_to_version_file_then_unknown(self):
+        # The fixture tree has no VERSION file: the build must still succeed.
+        result=self.build()
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        self.assertIn('App version: unknown', (self.out/'build-info.txt').read_text())
+        (self.root/'VERSION').write_text(' 3.1.4\n')
+        result=self.build()
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        self.assertIn('App version: 3.1.4', (self.out/'build-info.txt').read_text())
+
     def test_relative_output_path_with_spaces(self):
         result=self.build(CPANEL_OUT_DIR='output path/packages')
         self.assertEqual(result.returncode, 0, result.stdout+result.stderr)

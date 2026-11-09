@@ -10,6 +10,54 @@
 
 ---
 
+## [Unreleased] — در انتظار انتشار
+
+### 🆕 افزوده‌شده (Added)
+
+#### ساخت و انتشار خودکار بسته‌های cPanel در GitHub Actions
+- workflow با هر **push به `main`** و هر **تگ `v*`** به‌صورت خودکار
+  `cpanel-public.zip` و `cpanel-private.zip` را می‌سازد، همه آزمون‌ها را اجرا می‌کند و
+  نتیجه را در یک **GitHub Release** منتشر می‌کند؛ دیگر نیازی به «Run workflow» دستی و
+  شکار artifact در تب Actions نیست.
+- **Release چرخشی `latest-build`**: با هر مرج به `main` تگ به کامیت جدید منتقل و فایل‌ها با
+  `--clobber` جایگزین می‌شوند ⇒ دو آدرس دانلود ثابت و همیشگی. این Release عمداً
+  `--latest=false` است تا نشان **Latest** گیت‌هاب همیشه روی نسخه رسمی بماند.
+- **Release نسخه‌دار**: تگ‌های `v*` یک Release مستقل با `--verify-tag` می‌سازند.
+- متن فارسی خودکار هر Release شامل نسخه سامانه، کامیت و ref مبدأ، زمان بیلد،
+  اثر انگشت SHA256، فهرست راستی‌آزمایی‌های انجام‌شده و راهنمای نصب چهار مرحله‌ای است؛
+  جدیدترین `deploy/cpanel/UPGRADE-v*.fa.md` هم با نام ثابت `UPGRADE-GUIDE.fa.md` ضمیمه می‌شود.
+- اسکریپت‌های دانلود در پوشه `cpanel-release/`:
+  [`deploy/cpanel/download-release.sh`](deploy/cpanel/download-release.sh) (لینوکس/macOS/WSL) و
+  [`deploy/cpanel/download-release.ps1`](deploy/cpanel/download-release.ps1) (ویندوز) —
+  هر دو دانلود را در فایل موقت انجام و به‌صورت اتمی جابه‌جا می‌کنند و سپس
+  `SHA256SUMS` را راستی‌آزمایی می‌کنند.
+- سند کامل اتوماسیون: [`deploy/cpanel/RELEASE-AUTOMATION.fa.md`](deploy/cpanel/RELEASE-AUTOMATION.fa.md).
+
+### 🔒 امنیت (Security)
+- اصل کمترین دسترسی در workflow حفظ شد: پیش‌فرض سراسری `contents: read` و تنها job
+  انتشار `contents: write` می‌گیرد. PRها هیچ Release‌ای منتشر نمی‌کنند.
+- بسته پیش از انتشار دوباره راستی‌آزمایی می‌شود (`sha256sum -c` + `verify-package.sh`)
+  تا دقیقاً همان بایت‌هایی منتشر شوند که آزمون‌ها روی آن‌ها اجرا شده است.
+- `concurrency` دو اجرای هم‌زمان روی یک ref را پشت‌سرهم می‌کند تا روی یک تگ Release رقابت نکنند.
+
+### 🔧 تغییر یافته (Changed)
+- `build-info.txt` حالا `App version` و `Source: <ref> @ <commit>` را هم ثبت می‌کند
+  (از `CPANEL_BUILD_VERSION|BRANCH|COMMIT` در CI و از فایل `VERSION` در بیلد محلی) تا هر
+  ZIP منتشرشده به یک نسخه و یک کامیت قابل ردیابی باشد.
+- artifact با نام `cpanel-package` همچنان برای بازبینی PRها ساخته می‌شود و حالا
+  `UPGRADE-GUIDE.fa.md`، `COMMIT.txt` و `REF.txt` را نیز در بر می‌گیرد.
+- آزمون‌ها: `deploy/cpanel/tests/test_release_workflow.py` (۱۵ آزمون محافظ قرارداد انتشار)
+  و دو آزمون جدید در `test_build.py` برای `build-info.txt`.
+  مجموعاً **۳۴ آزمون، بدون شکست** (۷ آزمون HTTP نصب‌کننده فقط در CI با MySQL واقعی اجرا می‌شوند).
+
+### 📝 مستندات (Docs)
+- `README.md` و `deploy/cpanel/README.md` با مسیر جدید «دریافت خودکار بسته» به‌روز شدند.
+- گزارش ممیزی مشکلات باقی‌مانده پس از `v2.0.0`:
+  [`docs/AUDIT-REMAINING-ISSUES-v2.0.0.fa.md`](docs/AUDIT-REMAINING-ISSUES-v2.0.0.fa.md)
+  (۴ مورد P0، ۷ مورد P1 و ۱۳ مورد P2 با شاهد فایل:خط و ترتیب پیشنهادی رفع).
+
+---
+
 ## [2.0.0] — 2026-11-09
 
 ارتقای اصلی سامانه از «CRM قطعات» به «CRM دستگاه‌های صنعتی» با انبارداری واقعی،
